@@ -9,7 +9,7 @@ Description: Performs comparative copy-number analyses in order to identify
 	regions that are more recurrently amplified (or deleted) in 
 	cases vs. controls, using a Gaussian process latent difference model to
 	control for the covariance structure of genomic data.
-Depends: parallel, gpldiff
+Depends: parallel, gpldiff, GenomicRanges
 URL: https://bitbucket.org/djhshih/cngpld
 BugReports: https://bitbucket.org/djhshih/cngpld/issues
 License: GPL (>= 3)

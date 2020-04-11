@@ -1,11 +1,7 @@
-library(io)
-library(GenomicRanges)
+library(cngpld)
 
-genome <- "hg19";
-seg <- qread("tcga-pancan.seg");
-colnames(seg) <- c("sample", "chromosome", "start", "end", "nprobes", "logr");
-
-tss <- qread("tss.tsv");
+seg <- read_seg("tcga-pancan.seg");
+tss <- read.table("tss.tsv", sep="\t", header=TRUE);
 
 # collect LUAD samples
 code.luad <- as.character(tss$code[tss$study_name == "Lung adenocarcinoma"]);
@@ -23,6 +19,10 @@ seg.lusc <- do.call(rbind, lapply(code.lusc,
 	}
 ));
 
-qwrite(seg.luad, "tcga-luad.seg");
-qwrite(seg.lusc, "tcga-lusc.seg");
+write_seg <- function(x) {
+	write.table(x, row.names=FALSE, col.names=TRUE, quote=FALSE, sep="\t")
+}
+
+write_seg(seg.luad, "tcga-luad.seg");
+write_seg(seg.lusc, "tcga-lusc.seg");
 

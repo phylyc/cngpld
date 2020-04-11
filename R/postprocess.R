@@ -4,7 +4,9 @@ process_cn_regions <- function(regions) {
 	regions$start <- regions$start * 1e6;
 	regions$end <- regions$end * 1e6;
 
-	filter_centromere_regions(regions)
+	regions <- filter_centromere_regions(regions);
+	# sort by false discovery rate
+	regions[order(regions$fdr), ]
 }
 
 # filter out regions that overlap with padded centromere regions

@@ -1,0 +1,1 @@
+curl -L -o pancan.seg http://api.gdc.cancer.gov/data/00a32f7a-c85f-4f86-850d-be53973cbc4d

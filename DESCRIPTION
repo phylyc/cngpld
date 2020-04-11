@@ -1,0 +1,17 @@
+Package: cngpld
+Type: Package
+Title: Case-control Copy-number analysis using Gaussian process latent difference
+Version: 0.1
+Date: 2020-04-10
+Author: David J. H. Shih
+Maintainer: David J. H. Shih <djh.shih@gmail.com>
+Description: Performs comparative copy-number analyses in order to identify
+	regions that are more recurrently amplified (or deleted) in 
+	cases vs. controls, using a Gaussian process latent difference model to
+	control for the covariance structure of genomic data.
+Depends: parallel, gpldiff
+URL: https://bitbucket.org/djhshih/cngpld
+BugReports: https://bitbucket.org/djhshih/cngpld/issues
+License: GPL (>= 3)
+Encoding: UTF-8
+RoxygenNote: 6.1.1

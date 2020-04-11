@@ -192,8 +192,8 @@ compare_seg <- function(case, control, params=NULL, hparams=NULL, collapse=TRUE,
 	del.control <- lapply(s.control, function(x) x$del);
 
 	dsets <- list(
-		amp = mcmapply(prepare_cn, amp.case, amp.control, SIMPLIFY=FALSE);
-		del =  mcmapply(prepare_cn, del.case, del.control, SIMPLIFY=FALSE);
+		amp = mcmapply(prepare_cn, amp.case, amp.control, SIMPLIFY=FALSE),
+		del =  mcmapply(prepare_cn, del.case, del.control, SIMPLIFY=FALSE)
 	);
 
 	# fit models for amp and del separately, and for each chromosome

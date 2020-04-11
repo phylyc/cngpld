@@ -8,10 +8,14 @@ process_cn_regions <- function(regions) {
 }
 
 # filter out regions that overlap with padded centromere regions
-filter_centromere_regions <- function(regions, padding=10e6, genome="hg19") {
-	cen_chroms <- centromeres[[genome]]$chromosome;
-	cen_starts <- centromeres[[genome]]$start - padding;
-	cen_ends <- centromeres[[genome]]$end + padding;
+# @param padding  padding factor relative to the size of the centromere
+filter_centromere_regions <- function(regions, padding=1, genome="hg19") {
+	# centromere coordinates are stored in 1-based
+	cens <- centromeres[[genome]];
+	cen_chroms <- cens$chromosome;
+	cen_sizes <- cens$end - cens$start;
+	cen_starts <- (cens$start + 1) - padding * cen_sizes;
+	cen_ends <- cens$end + padding * cen_sizes;
 
 	idx <- match(regions$chromosome, cen_chroms);
 	regions[!overlap(regions$start, regions$end, cen_starts[idx], cen_ends[idx]), ]

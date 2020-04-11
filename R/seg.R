@@ -146,9 +146,10 @@ collapse_runs <- function(d, digits=2, max.len=2e6) {
 #' @param hparams  hyperparameter values to \code{gpldiff()}
 #' @param collapse whether to collapse runs of repeats (improves speed)
 #' @param cutoff   absolute threshold for copy-number log ratio
+#' @param verbose  verbosity level; none: 0, info: 1, debug: 2
 #' @param ...      other parameters to \code{gpldiff()}
 #' @return a list of \code{gpldiff} objects
-compare_seg <- function(case, control, params=NULL, hparams=NULL, collapse=TRUE, cutoff=0.1, ...) {
+compare_seg <- function(case, control, params=NULL, hparams=NULL, collapse=TRUE, cutoff=0.1, verbose=1, ...) {
 	
 	if (is.character(case)) {
 		case <- read_seg(case);
@@ -200,8 +201,10 @@ compare_seg <- function(case, control, params=NULL, hparams=NULL, collapse=TRUE,
 		function(dset, type) {
 			mclapply(names(dset),
 				function(i) {
-					message("Processing ", type, i)
-					gpldiff(dset[[i]], params=params, hparams=hparams, ...)
+					if (verbose >= 1) {
+						message("Processing ", type, i)
+					}
+					gpldiff(dset[[i]], params=params, hparams=hparams, verbose=verbose, ...)
 			});
 		},
 		dsets, names(dests),

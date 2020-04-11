@@ -19,9 +19,10 @@ read_gistic <- function(file) {
 #' @param control  file name of GISTIC scores table for control cohort
 #' @param param    initial parameter values to \code{gpldiff()}
 #' @param hparams  hyperparameter values to \code{gpldiff()}
+#' @param verbose  verbosity level; none: 0, info: 1, debug: 2
 #' @param ...      other paramsters to \code{gpldiff()}
 #' @return a list of \code{gpldiff} objects
-compare_gistics <- function(case, control, params=NULL, hparams=NULL, ...) {
+compare_gistics <- function(case, control, params=NULL, hparams=NULL, verbose=1, ...) {
 
 	if (is.character(case)) {
 		case <- read_gistic(case);
@@ -40,7 +41,9 @@ compare_gistics <- function(case, control, params=NULL, hparams=NULL, ...) {
 
 	data.sets <- mcmapply(prepare_cn, case.split, control.split, SIMPLIFY=FALSE);
 	models <- mclapply(names(data.sets), function(i) { 
-		message("Processing ", i)
+		if (verbose >= 1) {
+			message("Processing ", i)
+		}
 		gpldiff(data.sets[[i]], params=params, hparams=hparams, ...)
 	});
 

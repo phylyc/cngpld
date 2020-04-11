@@ -70,7 +70,7 @@ summary.gistic_gpldiffs <- function(object, direction=1) {
 	regions.amp <- regions.all[grep("Amp", names(regions.all)), drop=FALSE];
 	names(regions.amp) <- sub("Amp.", "", names(regions.amp));
 	regions.amp <- process_regions(combine_regions(regions.amp), direction=direction);
-	if (nrow(regions.amp) > 0) {
+	if (!is.null(regions.del) && nrow(regions.amp) > 0) {
 		regions.amp <- data.frame(
 			type = "Amp",
 			regions.amp
@@ -82,7 +82,7 @@ summary.gistic_gpldiffs <- function(object, direction=1) {
 	regions.del <- regions.all[grep("Del", names(regions.all)), drop=FALSE];
 	names(regions.del) <- sub("Del.", "", names(regions.del));
 	regions.del <- process_regions(combine_regions(regions.del), direction=direction);
-	if (nrow(regions.del) > 0) {
+	if (!is.null(regions.del) && nrow(regions.del) > 0) {
 		regions.del <- data.frame(
 			type = "Del",
 			regions.del

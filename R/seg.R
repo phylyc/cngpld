@@ -202,7 +202,7 @@ compare_seg <- function(case, control, params=NULL, hparams=NULL, collapse=TRUE,
 			mclapply(names(dset),
 				function(i) {
 					if (verbose >= 1) {
-						message("Processing ", type, i)
+						message("Processing ", type, " ", i)
 					}
 					gpldiff(dset[[i]], params=params, hparams=hparams, verbose=verbose, ...)
 			});

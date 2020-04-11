@@ -207,7 +207,7 @@ compare_seg <- function(case, control, params=NULL, hparams=NULL, collapse=TRUE,
 					gpldiff(dset[[i]], params=params, hparams=hparams, verbose=verbose, ...)
 			});
 		},
-		dsets, names(dests),
+		dsets, names(dsets),
 		SIMPLIFY=FALSE
 	);
 

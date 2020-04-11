@@ -244,8 +244,8 @@ summary.cn_gpldiffs <- function(object, direction=1) {
 	);
 
 	regions <- mcmapply(
-		function(regions, type) {
-			d <- process_regions(combine_regions(rsets$amp), direction=direction);
+		function(rset, type) {
+			d <- process_regions(combine_regions(rset), direction=direction);
 			if (nrow(d) > 0) {
 				data.frame(type = type, d)
 			} else {

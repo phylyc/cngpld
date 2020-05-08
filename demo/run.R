@@ -19,18 +19,13 @@ seg.lusc <- qread("tcga-lusc.seg");
 
 # Run analysis ###############################################################
 
-# fits <- qread("cngpld_luad-vs-lusc.rds")
+fits <- qread("cngpld_luad-vs-lusc.rds")
 
 # complete analysis took 49595 s = 13.8 h
 # on a single-thread of a Core i7 CPU @ 2.93GHz
 
-time.began <- proc.time();
-
 #options(mc.cores=1);
 fits <- compare_segs(seg.luad, seg.lusc);
-
-elapsed <- proc.time() - time.began;
-message("elasped wall time: ", elapsed[3]);
 
 qwrite(fits, "cngpld_luad-vs-lusc.rds");
 

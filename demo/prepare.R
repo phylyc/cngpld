@@ -20,10 +20,6 @@ seg.lusc <- do.call(rbind, lapply(code.lusc,
 	}
 ));
 
-write_seg <- function(x, fname) {
-	write.table(x, fname, row.names=FALSE, col.names=TRUE, quote=FALSE, sep="\t")
-}
-
 write_seg(seg.luad, "tcga-luad.seg");
 write_seg(seg.lusc, "tcga-lusc.seg");
 

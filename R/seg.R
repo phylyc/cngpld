@@ -31,6 +31,16 @@ read_seg <- function(file, ...) {
 	x
 }
 
+#' Write a copy-number segmentation file
+#'
+#' @param x     \code{data.frame} with segmentation data
+#' @param file  path to the seg file containing log ratios
+#' @return a \code{data.frame}
+#' @export
+write_seg <- function(x, file, ...) {
+	write.table(x, file, row.names=FALSE, col.names=TRUE, quote=FALSE, sep="\t", ...)
+}
+
 #' Convert data.frame of segments to GRanges
 #' 
 #' @import GenomicRanges IRanges GenomeInfoDb

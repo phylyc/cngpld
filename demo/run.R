@@ -1,3 +1,4 @@
+library(io)
 library(dplyr)
 library(ggplot2)
 library(scales)
@@ -12,21 +13,25 @@ load_all();
 
 genome <- "hg19";
 
+fits.fn <- "cngpld_luad-vs-lusc.rds";
+
 seg.luad <- read_seg("tcga-luad.seg");
 seg.lusc <- read_seg("tcga-lusc.seg");
 
-
 # Run analysis ###############################################################
 
-fits <- read_seg("cngpld_luad-vs-lusc.rds")
+if (file.exists(fits.fn)) {
+	fits <- qread(fits.fn);
+} else {
 
-# complete analysis took 49595 s = 13.8 h
-# on a single-thread of a Core i7 CPU @ 2.93GHz
+	# complete analysis took 49595 s = 13.8 h
+	# on a single-thread of a Core i7 CPU @ 2.93GHz
 
-#options(mc.cores=1);
-fits <- compare_segs(seg.luad, seg.lusc);
+	#options(mc.cores=1);
+	fits <- compare_segs(seg.luad, seg.lusc);
 
-qwrite(fits, "cngpld_luad-vs-lusc.rds");
+	qwrite(fits, fits.fn);
+}
 
 
 # Examine results ############################################################

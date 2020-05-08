@@ -49,6 +49,6 @@ qdraw(
 		)
 	},
 	width = 5, height = 10,
-	file = "cngpld_luad_nkx2-1.pdf")
+	file = "cngpld_luad_nkx2-1.pdf"
 )
 

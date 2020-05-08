@@ -48,7 +48,7 @@ qdraw(
 		)
 	},
 	width = 5, height = 10,
-	file = "cngpld_luad_nkx2-1.pdf")
+	file = "cngpld_luad_nkx2-1.pdf"
 )
 
 # significant regions in LUSC
@@ -62,7 +62,7 @@ qdraw(
 		)
 	},
 	width = 5, height = 10,
-	file = "cngpld_lusc_ccnd1.pdf")
+	file = "cngpld_lusc_ccnd1.pdf"
 )
 
 with(fits$amp[["3"]], plot(model, data))   # chr3q arm

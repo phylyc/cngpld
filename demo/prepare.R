@@ -1,4 +1,5 @@
-library(cngpld)
+library(devtools)
+load_all()
 
 seg <- read_seg("tcga-pancan.seg");
 tss <- read.table("tss.tsv", sep="\t", header=TRUE);
@@ -19,8 +20,8 @@ seg.lusc <- do.call(rbind, lapply(code.lusc,
 	}
 ));
 
-write_seg <- function(x) {
-	write.table(x, row.names=FALSE, col.names=TRUE, quote=FALSE, sep="\t")
+write_seg <- function(x, fname) {
+	write.table(x, fname, row.names=FALSE, col.names=TRUE, quote=FALSE, sep="\t")
 }
 
 write_seg(seg.luad, "tcga-luad.seg");

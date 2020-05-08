@@ -1,5 +1,5 @@
 
-all: tcga-pancan.seg
+all: tcga-pancan.seg tcga-luad.seg tcga-lusc.seg
 	
 
 tcga-pancan.seg:

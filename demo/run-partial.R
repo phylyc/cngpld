@@ -24,7 +24,7 @@ seg.lusc.chr <- seg.lusc[seg.lusc$chromosome %in% chrno, ];
 
 # Run analysis ###############################################################
 
-# complete analysis took 10 min
+# complete analysis took 15 min
 # on a single-thread of a Core i7 CPU @ 2.93GHz
 
 #options(mc.cores=1);

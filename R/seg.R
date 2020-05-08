@@ -3,7 +3,7 @@
 #' @param file  path to the seg file containing log ratios
 #' @return a \code{data.frame}
 #' @export
-read_seg <- function(file) {
+read_seg <- function(file, ...) {
 
 	# open a file connection
 	if (is.character(file)) {
@@ -12,7 +12,7 @@ read_seg <- function(file) {
 		f <- file;
 	}
 
-	header <- scan(f, character(), nlines=1, comment.char="#", quiet=TRUE);
+	header <- scan(f, character(), sep="\t", nlines=1, comment.char="#", quiet=TRUE);
 
 	# continue reading the file connection
 	# assume first four columns are:

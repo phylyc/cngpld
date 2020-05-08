@@ -1,4 +1,3 @@
-library(io)
 library(dplyr)
 library(ggplot2)
 library(scales)
@@ -13,13 +12,13 @@ load_all();
 
 genome <- "hg19";
 
-seg.luad <- qread("tcga-luad.seg");
-seg.lusc <- qread("tcga-lusc.seg");
+seg.luad <- read_seg("tcga-luad.seg");
+seg.lusc <- read_seg("tcga-lusc.seg");
 
 
 # Run analysis ###############################################################
 
-fits <- qread("cngpld_luad-vs-lusc.rds")
+fits <- read_seg("cngpld_luad-vs-lusc.rds")
 
 # complete analysis took 49595 s = 13.8 h
 # on a single-thread of a Core i7 CPU @ 2.93GHz

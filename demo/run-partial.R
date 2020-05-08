@@ -12,8 +12,8 @@ load_all();
 
 genome <- "hg19";
 
-seg.luad <- qread("tcga-luad.seg");
-seg.lusc <- qread("tcga-lusc.seg");
+seg.luad <- read_seg("tcga-luad.seg");
+seg.lusc <- read_seg("tcga-lusc.seg");
 
 chrno <- "14";
 chrom <- paste0("chr", chrno);

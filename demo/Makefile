@@ -11,3 +11,6 @@ tcga-luad.seg: tcga-pancan.seg
 tcga-lusc.seg: tcga-pancan.seg
 	Rscript prepare.R
 
+clean:
+	rm -f *.rds *.pdf *.seg
+

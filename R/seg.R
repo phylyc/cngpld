@@ -204,7 +204,7 @@ compare_seg <- function(case, control, params=NULL, hparams=NULL, collapse=TRUE,
 					if (verbose >= 1) {
 						message("Processing ", type, " ", i)
 					}
-					gpldiff(dset[[i]], params=params, hparams=hparams, verbose=verbose, ...)
+					gpldiff::gpldiff(dset[[i]], params=params, hparams=hparams, verbose=verbose, ...)
 			});
 		},
 		dsets, names(dsets),
@@ -237,7 +237,7 @@ summary.cn_gpldiffs <- function(object, direction=1) {
 		function(fset) {
 			mclapply(fset,
 				function(fit) {
-					find_sig_regions(fit$model, fit$data, direction=direction, process=FALSE);
+					gpldiff::find_sig_regions(fit$model, fit$data, direction=direction, process=FALSE);
 				}
 			)
 		}
@@ -245,7 +245,7 @@ summary.cn_gpldiffs <- function(object, direction=1) {
 
 	regions <- mcmapply(
 		function(rset, type) {
-			d <- process_regions(combine_regions(rset), direction=direction);
+			d <- gpldiff::process_regions(combine_regions(rset), direction=direction);
 			if (!is.null(d) && nrow(d) > 0) {
 				data.frame(type = type, d)
 			} else {

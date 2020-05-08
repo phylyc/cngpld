@@ -25,7 +25,7 @@ filter_centromere_regions <- function(regions, padding=1, genome="hg19") {
 	cen_ends <- cens$end + padding * cen_sizes;
 
 	idx <- match(regions$chromosome, cen_chroms);
-	regions[!overlap(regions$start, regions$end, cen_starts[idx], cen_ends[idx]), ]
+	regions[!gpldiff:::overlap(regions$start, regions$end, cen_starts[idx], cen_ends[idx]), ]
 }
 
 # combine regions from different chromosomes together

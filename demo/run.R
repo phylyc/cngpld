@@ -4,6 +4,7 @@ library(ggplot2)
 library(scales)
 library(ggrepel)
 
+library(parallel)
 library(devtools)
 load_all();
 
@@ -17,6 +18,8 @@ seg.lusc <- qread("tcga-lusc.seg");
 
 
 # Run analysis ###############################################################
+
+# fits <- qread("cngpld_luad-vs-lusc.rds")
 
 # complete analysis took 49595 s = 13.8 h
 # on a single-thread of a Core i7 CPU @ 2.93GHz
@@ -87,7 +90,7 @@ regions.all <- rbind(
 	data.frame(regions.luad, group="case"),
 	data.frame(regions.lusc, group="control")
 );
-regions.all$group <- factor(regions.all$group, levels=c("case", "control", "NS"));
+regions.all$group <- factor(regions.all$group, levels=c("control", "case", "NS"));
 idx <- with(regions.all, end - start + 1 > 2e6 & abs(ldiff) > 0.15 & fdr < 0.05 & n_obs > 10);
 regions.all$keep <- 0.75;
 regions.all$keep[idx] <- 1.0;

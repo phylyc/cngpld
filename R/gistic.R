@@ -44,7 +44,7 @@ compare_gistics <- function(case, control, params=NULL, hparams=NULL, verbose=1,
 		if (verbose >= 1) {
 			message("Processing ", i)
 		}
-		gpldiff(data.sets[[i]], params=params, hparams=hparams, ...)
+		gpldiff::gpldiff(data.sets[[i]], params=params, hparams=hparams, ...)
 	});
 
 	fits <- mapply(function(d, m) list(data = d, model = m), data.sets, models, SIMPLIFY=FALSE)
@@ -63,13 +63,13 @@ summary.gistic_gpldiffs <- function(object, direction=1) {
 	regions.all <- lapply(
 		object,
 		function(fit) {
-			find_sig_regions(fit$model, fit$data, direction=direction, process=FALSE);
+			gpldiff::find_sig_regions(fit$model, fit$data, direction=direction, process=FALSE);
 		}
 	);
 
 	regions.amp <- regions.all[grep("Amp", names(regions.all)), drop=FALSE];
 	names(regions.amp) <- sub("Amp.", "", names(regions.amp));
-	regions.amp <- process_regions(combine_regions(regions.amp), direction=direction);
+	regions.amp <- gpldiff::process_regions(combine_regions(regions.amp), direction=direction);
 	if (!is.null(regions.del) && nrow(regions.amp) > 0) {
 		regions.amp <- data.frame(
 			type = "Amp",
@@ -81,7 +81,7 @@ summary.gistic_gpldiffs <- function(object, direction=1) {
 
 	regions.del <- regions.all[grep("Del", names(regions.all)), drop=FALSE];
 	names(regions.del) <- sub("Del.", "", names(regions.del));
-	regions.del <- process_regions(combine_regions(regions.del), direction=direction);
+	regions.del <- gpldiff::process_regions(combine_regions(regions.del), direction=direction);
 	if (!is.null(regions.del) && nrow(regions.del) > 0) {
 		regions.del <- data.frame(
 			type = "Del",

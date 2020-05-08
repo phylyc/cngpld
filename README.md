@@ -34,5 +34,5 @@ Retrieve and preprocess the input files by
 make
 ```
 
-Then, perform the analysis by running `partial-run.R` or `run.R`.
+Then, perform the analysis by executing `run-partial.R` or `run.R`.
 

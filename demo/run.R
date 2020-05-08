@@ -12,17 +12,20 @@ load_all();
 # Read data #################################################################
 
 genome <- "hg19";
-
 fits.fn <- "cngpld_luad-vs-lusc.rds";
 
-seg.luad <- read_seg("tcga-luad.seg");
-seg.lusc <- read_seg("tcga-lusc.seg");
 
 # Run analysis ###############################################################
 
 if (file.exists(fits.fn)) {
+
+	warning("Warning: Using cached model")
 	fits <- qread(fits.fn);
+
 } else {
+
+	seg.luad <- read_seg("tcga-luad.seg");
+	seg.lusc <- read_seg("tcga-lusc.seg");
 
 	# complete analysis took 49595 s = 13.8 h
 	# on a single-thread of a Core i7 CPU @ 2.93GHz

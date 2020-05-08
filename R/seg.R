@@ -45,7 +45,7 @@ seg_to_gr <- function(seg, genome=NA) {
 	}
 
 	gr <- GRanges(
-		seqnames = paste0("chr", seg$chroms),
+		seqnames = chroms,
 		ranges = IRanges(start = seg$start, end = seg$end),
 		logr = seg$logr,
 		sample = seg$sample,

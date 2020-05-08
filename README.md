@@ -1,8 +1,9 @@
-# Case-control Copy-number analysis using Gaussian process latent difference
+# Case-control copy-number analysis 
 
-Package for performing a case-control copy-number analysis from copy-number seg
-files or GISTIC2 outputs. The model identities regions that are more frequently
-disrupted in the case cohort compared to the control.
+Package for performing a case-control copy-number analysis
+using Gaussian process latent difference from copy-number seg
+files or GISTIC2 outputs. This statistical model identities regions that 
+are more frequently disrupted in the case cohort compared to the control.
 
 ### Installation ###
 

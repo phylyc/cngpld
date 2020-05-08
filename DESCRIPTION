@@ -1,6 +1,6 @@
 Package: cngpld
 Type: Package
-Title: Case-control Copy-number analysis using Gaussian process latent difference
+Title: Case-control Copy-number Analysis Using Gaussian Process Latent Difference
 Version: 0.1
 Date: 2020-04-10
 Author: David J. H. Shih

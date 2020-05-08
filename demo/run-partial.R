@@ -30,7 +30,7 @@ seg.lusc.chr <- seg.lusc[seg.lusc$chromosome %in% chrno, ];
 time.began <- proc.time();
 
 #options(mc.cores=1);
-fits <- compare_seg(seg.luad.chr, seg.lusc.chr);
+fits <- compare_segs(seg.luad.chr, seg.lusc.chr);
 
 elapsed <- proc.time() - time.began;
 message("elasped wall time: ", elapsed[3]);

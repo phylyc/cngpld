@@ -27,7 +27,7 @@ seg.lusc <- qread("tcga-lusc.seg");
 time.began <- proc.time();
 
 #options(mc.cores=1);
-fits <- compare_seg(seg.luad, seg.lusc);
+fits <- compare_segs(seg.luad, seg.lusc);
 
 elapsed <- proc.time() - time.began;
 message("elasped wall time: ", elapsed[3]);

@@ -15,6 +15,8 @@ read_gistic <- function(file) {
 
 #' Compare GISTIC scores using GPLDIFF.
 #'
+#' @import parallel gpldiff
+#'
 #' @param case     file name of GISTIC scores table for case cohort
 #' @param control  file name of GISTIC scores table for control cohort
 #' @param param    initial parameter values to \code{gpldiff()}

@@ -163,6 +163,7 @@ collapse_runs <- function(d, digits=2, max.len=2e6) {
 #' @param verbose  verbosity level; none: 0, info: 1, debug: 2
 #' @param ...      other parameters to \code{gpldiff()}
 #' @return a list of \code{gpldiff} objects
+#' @export
 compare_segs <- function(case, control, params=NULL, hparams=NULL, collapse=TRUE, cutoff=0.1, verbose=1, ...) {
 	
 	if (is.character(case)) {
@@ -244,6 +245,7 @@ compare_segs <- function(case, control, params=NULL, hparams=NULL, collapse=TRUE
 #'
 #' @param object  a \code{cn_gpldiffs} object
 #' @return a \code{list} of \code{data.frame}
+#' @export
 summary.cn_gpldiffs <- function(object, direction=1) {
 	# cn_gpldiffs is organized as a list of lists,
 	# with first level grouping by type (amp vs. del)

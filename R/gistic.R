@@ -24,6 +24,7 @@ read_gistic <- function(file) {
 #' @param verbose  verbosity level; none: 0, info: 1, debug: 2
 #' @param ...      other paramsters to \code{gpldiff()}
 #' @return a list of \code{gpldiff} objects
+#' @export
 compare_gistics <- function(case, control, params=NULL, hparams=NULL, verbose=1, ...) {
 
 	if (is.character(case)) {
@@ -59,6 +60,7 @@ compare_gistics <- function(case, control, params=NULL, hparams=NULL, verbose=1,
 #'
 #' @param object  a \code{gistic_gpldiffs} object
 #' @return a \code{list} of \code{data.frame}
+#' @export
 summary.gistic_gpldiffs <- function(object, direction=1) {
 	# gistic_gpldiffs is organized as a flat list
 

@@ -39,6 +39,10 @@ if (file.exists(fits.fn)) {
 
 # Examine results ############################################################
 
+# remove problematic deletion profiles
+idx <- unlist(lapply(fits$del, function(x) is(x$model, "gpldiff")));
+fits$del <- fits$del[idx];
+
 # significant regions in LUAD
 regions.luad <- summary(fits);
 filter(regions.luad, end - start + 1 > 2e6, abs(ldiff) > 0.1, fdr < 0.05, n_obs > 10)
@@ -71,8 +75,8 @@ with(fits$amp[["3"]], plot(model, data))   # chr3q arm
 with(fits$amp[["2"]], plot(model, data))   # chr2q amplicon
 with(fits$amp[["9"]], plot(model, data))   # chr9p amplicon
 with(fits$del[["2"]], plot(model, data))   # LRP1B deletion
-with(fits$del[["3"]], plot(model, data))   # chr3q deletion
-with(fits$del[["5"]], plot(model, data))   # chr3p deletion
+#with(fits$del[["3"]], plot(model, data))   # chr3q deletion
+#with(fits$del[["5"]], plot(model, data))   # chr3p deletion
 
 qwrite(regions.luad, "cngpld_sig-regions_luad.tsv");
 qwrite(regions.lusc, "cngpld_sig-regions_lusc.tsv");

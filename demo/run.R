@@ -4,7 +4,6 @@ library(ggplot2)
 library(scales)
 library(ggrepel)
 
-library(parallel)
 library(devtools)
 load_all();
 
@@ -38,6 +37,10 @@ if (file.exists(fits.fn)) {
 
 
 # Examine results ############################################################
+
+# problematic deletion profiles:
+which(unlist(lapply(fits$del, function(x) ! is(x$model, "gpldiff"))))
+# chroms 1 11 13 15 17 19 20 22  3  5  7  9
 
 # remove problematic deletion profiles
 idx <- unlist(lapply(fits$del, function(x) is(x$model, "gpldiff")));

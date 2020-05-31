@@ -75,7 +75,12 @@ mean_cn_at_position <- function(gr, pos, direction, cutoff) {
 	idx <- as.matrix(ov)[,1];
 	logr <- direction * gr$logr[idx];
 	idx2 <- logr > cutoff;
-	sum(logr[idx2]) / sum(idx2)
+
+	if (sum(idx2) > 0) {
+		sum(logr[idx2]) / length(logr)
+	} else {
+		0
+	}
 }
 
 #' Summarize copy-number values
@@ -161,13 +166,14 @@ collapse_runs <- function(d, digits=2, max.len=2e6) {
 #'                 or \code{data.frame}
 #' @param param    initial parameter values to \code{gpldiff()}
 #' @param hparams  hyperparameter values to \code{gpldiff()}
+#' @param smooth   whether to median smooth the copy-number data
 #' @param collapse whether to collapse runs of repeats (improves speed)
 #' @param cutoff   absolute threshold for copy-number log ratio
 #' @param verbose  verbosity level; none: 0, info: 1, debug: 2
 #' @param ...      other parameters to \code{gpldiff()}
 #' @return a list of \code{gpldiff} objects
 #' @export
-compare_segs <- function(case, control, params=NULL, hparams=NULL, collapse=TRUE, cutoff=0.1, verbose=1, ...) {
+compare_segs <- function(case, control, params=NULL, hparams=NULL, smooth=TRUE, collapse=TRUE, cutoff=0.1, verbose=1, ...) {
 	
 	if (is.character(case)) {
 		case <- read_seg(case);
@@ -190,6 +196,10 @@ compare_segs <- function(case, control, params=NULL, hparams=NULL, collapse=TRUE
 		gr <- seg_to_gr(seg);
 		d.amp <- summarize_cn(gr, direction=1, cutoff=cutoff);
 		d.del <- summarize_cn(gr, direction=-1, cutoff=cutoff);
+		if (smooth) {
+			d.amp$value <- as.numeric(smooth(d.amp$value));
+			d.del$value <- as.numeric(smooth(d.del$value));
+		}
 		if (collapse) {
 			d.amp <- collapse_runs(d.amp);
 			d.del <- collapse_runs(d.del);

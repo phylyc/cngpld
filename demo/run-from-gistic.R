@@ -6,6 +6,7 @@ load_all();
 
 #options(mc.cores=1);
 
+genome <- "hg19";
 case.fn <- "gistic2/tcga-luad/scores.gistic";
 control.fn <- "gistic2/tcga-lusc/scores.gistic";
 
@@ -28,7 +29,7 @@ fits <- compare_gistics(case, control);
 qwrite(fits, fits.fn);
 
 
-regions.case <- summary(fits);
+regions.case <- summary(fits, genome=genome);
 regions.case.f <- filter(regions.case, end - start + 1 > 2e6, abs(ldiff) > 0.1, fdr < 0.05, n_obs > 10);
 print(regions.case.f)
 
@@ -43,7 +44,7 @@ qdraw(
 )
 
 
-regions.control <- summary(fits, direction=-1);
+regions.control <- summary(fits, direction=-1, genome=genome);
 regions.control.f <- filter(regions.control, end - start + 1 > 2e6, abs(ldiff) > 0.1, fdr < 0.05, n_obs > 10);
 print(regions.control.f)
 

@@ -1,16 +1,20 @@
 # process copy-number regions
 process_cn_regions <- function(regions) {
-	# convert position from Mbp back to bp
-	regions$start <- regions$start * 1e6;
-	regions$end <- regions$end * 1e6;
-
-	regions <- filter_centromere_regions(regions);
-
 	if (is.null(regions)) {
 		NULL
 	} else {
-		# sort by false discovery rate
-		regions[order(regions$fdr), ]
+		# convert position from Mbp back to bp
+		regions$start <- regions$start * 1e6;
+		regions$end <- regions$end * 1e6;
+
+		regions <- filter_centromere_regions(regions);
+
+		if (is.null(regions)) {
+			NULL
+		} else {
+			# sort by false discovery rate
+			regions[order(regions$fdr), ]
+		}
 	}
 }
 

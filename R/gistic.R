@@ -74,7 +74,7 @@ summary.gistic_gpldiffs <- function(object, direction=1) {
 	regions.amp <- regions.all[grep("Amp", names(regions.all)), drop=FALSE];
 	names(regions.amp) <- sub("Amp.", "", names(regions.amp));
 	regions.amp <- gpldiff::process_regions(combine_regions(regions.amp), direction=direction);
-	if (!is.null(regions.del) && nrow(regions.amp) > 0) {
+	if (!is.null(regions.amp) && nrow(regions.amp) > 0) {
 		regions.amp <- data.frame(
 			type = "Amp",
 			regions.amp

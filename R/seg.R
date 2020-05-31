@@ -72,7 +72,7 @@ mean_cn_at_position <- function(gr, pos, direction, cutoff) {
 	# S4Vectors::from is not available in older versions (v0.8.11),
 	# so we avoid using it
 	ov <- findOverlaps(ranges(gr), IRanges(start=pos, end=pos));
-	idx <- as.matrix(ov)[1,];
+	idx <- as.matrix(ov)[,1];
 	logr <- direction * gr$logr[idx];
 	idx2 <- logr > cutoff;
 	sum(logr[idx2]) / sum(idx2)

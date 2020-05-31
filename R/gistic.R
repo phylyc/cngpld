@@ -17,13 +17,15 @@ read_gistic <- function(file) {
 #'
 #' @import parallel gpldiff
 #'
-#' @param case     file name of GISTIC scores table for case cohort
-#' @param control  file name of GISTIC scores table for control cohort
+#' @param case     file name of GISTIC scores table for case cohort,
+#'                 or \code{data.frame}
+#' @param control  file name of GISTIC scores table for control cohort,
+#'                 or \code{data.frame}
 #' @param param    initial parameter values to \code{gpldiff()}
 #' @param hparams  hyperparameter values to \code{gpldiff()}
 #' @param verbose  verbosity level; none: 0, info: 1, debug: 2
 #' @param ...      other paramsters to \code{gpldiff()}
-#' @return a list of \code{gpldiff} objects
+#' @return a \code{cn_gpldiff} object
 #' @export
 compare_gistics <- function(case, control, params=NULL, hparams=NULL, verbose=1, ...) {
 
@@ -42,62 +44,43 @@ compare_gistics <- function(case, control, params=NULL, hparams=NULL, verbose=1,
 	case.split <- split(case, list(type = case$type, chromosome = case$chromosome));
 	control.split <- split(control, list(type = control$type, chromosome = control$chromosome));
 
-	data.sets <- mcmapply(prepare_cn, case.split, control.split, SIMPLIFY=FALSE);
-	models <- mclapply(names(data.sets), function(i) { 
+	# prepare data and fit model
+	datas <- mcmapply(prepare_cn, case.split, control.split, SIMPLIFY=FALSE);
+	models <- mclapply(names(datas), function(i) { 
 		if (verbose >= 1) {
 			message("Processing ", i)
 		}
-		gpldiff::gpldiff(data.sets[[i]], params=params, hparams=hparams, ...)
+		gpldiff::gpldiff(datas[[i]], params=params, hparams=hparams, ...)
 	});
 
-	fits <- mapply(function(d, m) list(data = d, model = m), data.sets, models, SIMPLIFY=FALSE)
-	
-	structure(fits, class="gistic_gpldiffs")
-}
+	# organize results by amp and del
+	idx.amp <- grep("Amp", names(datas));
+	idx.del <- grep("Del", names(datas));
 
-
-#' Summarize \code{gistic_gpldiffs} object.
-#'
-#' @param object  a \code{gistic_gpldiffs} object
-#' @return a \code{list} of \code{data.frame}
-#' @export
-summary.gistic_gpldiffs <- function(object, direction=1) {
-	# gistic_gpldiffs is organized as a flat list
-
-	regions.all <- lapply(
-		object,
-		function(fit) {
-			gpldiff::find_sig_regions(fit$model, fit$data, direction=direction, process=FALSE);
-		}
+	dsets <- list(
+		amp = datas[idx.amp],
+		del = datas[idx.del]
 	);
+	names(dsets$amp) <- sub("Amp.", "", names(dsets$amp));
+	names(dsets$del) <- sub("Del.", "", names(dsets$del));
 
-	regions.amp <- regions.all[grep("Amp", names(regions.all)), drop=FALSE];
-	names(regions.amp) <- sub("Amp.", "", names(regions.amp));
-	regions.amp <- gpldiff::process_regions(combine_regions(regions.amp), direction=direction);
-	if (!is.null(regions.amp) && nrow(regions.amp) > 0) {
-		regions.amp <- data.frame(
-			type = "Amp",
-			regions.amp
-		);
-	} else {
-		regions.amp <- NULL;
-	}
+	msets <- list(
+		amp = models[idx.amp],
+		del =	models[idx.del] 
+	);
+	names(msets$amp) <- sub("Amp.", "", names(msets$amp));
+	names(msets$del) <- sub("Del.", "", names(msets$del));
 
-	regions.del <- regions.all[grep("Del", names(regions.all)), drop=FALSE];
-	names(regions.del) <- sub("Del.", "", names(regions.del));
-	regions.del <- gpldiff::process_regions(combine_regions(regions.del), direction=direction);
-	if (!is.null(regions.del) && nrow(regions.del) > 0) {
-		regions.del <- data.frame(
-			type = "Del",
-			regions.del
-		);
-	} else {
-		regions.del <- NULL;
-	}
-
-	process_cn_regions(
-		rbind(regions.amp, regions.del)
-	)
+	# zip matching data and model together
+	fits <- mapply(
+		function(dset, mset) {
+			mapply(function(d, m) list(data = d, model = m), dset, mset, SIMPLIFY=FALSE);
+		},
+		dsets, msets,
+		SIMPLIFY=FALSE
+	);
+	
+	structure(fits, class="cn_gpldiffs")
 }
 
 read_gistic_peaks <- function(fname) {

@@ -15,8 +15,8 @@ genome <- "hg19";
 seg.luad <- read_seg("tcga-luad.seg");
 seg.lusc <- read_seg("tcga-lusc.seg");
 
-chrno <- "14";
-chrom <- paste0("chr", chrno);
+# NKX2-1 (TFF-1) amplicon is on chr14
+chrno <- c("14", "19", "22");
 
 seg.luad.chr <- seg.luad[seg.luad$chromosome %in% chrno, ];
 seg.lusc.chr <- seg.lusc[seg.lusc$chromosome %in% chrno, ];
@@ -24,7 +24,7 @@ seg.lusc.chr <- seg.lusc[seg.lusc$chromosome %in% chrno, ];
 
 # Run analysis ###############################################################
 
-# complete analysis took 15 min
+# complete analysis of chr14 took 15 min
 # on a single-thread of a Core i7 CPU @ 2.93GHz
 
 #options(mc.cores=1);
@@ -35,15 +35,19 @@ fits <- compare_segs(seg.luad.chr, seg.lusc.chr);
 
 # significant regions in LUAD
 regions.luad <- summary(fits);
-filter(regions.luad, end - start + 1 > 2e6, abs(ldiff) > 0.1, fdr < 0.05, n_obs > 10)
+if (!is.null(regions.luad)) {
+	filter(regions.luad, end - start + 1 > 2e6, abs(ldiff) > 0.1, fdr < 0.05, n_obs > 10)
+}
 
-qdraw(
-	{
-		with(fits$amp[["14"]],  # NKX2-1 (TFF-1) amplicon
-			plot(model, data, which=c("response", "latent", "odds"), xlab="position (Mbp)")
-		)
-	},
-	width = 5, height = 10,
-	file = "cngpld_luad_nkx2-1.pdf"
-)
+for (ch in chrno) {
+	qdraw(
+		{
+			with(fits$amp[[ch]],  
+				plot(model, data, which=c("response", "latent", "odds"), xlab="position (Mbp)")
+			)
+		},
+		width = 5, height = 10,
+		file = sprintf("cngpld_luad_amp_chr%s.pdf", ch)
+	)
+}
 

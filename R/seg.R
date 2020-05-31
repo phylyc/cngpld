@@ -221,7 +221,7 @@ compare_segs <- function(case, control, params=NULL, hparams=NULL, smooth=TRUE, 
 
 	dsets <- list(
 		amp = mcmapply(prepare_cn, amp.case, amp.control, SIMPLIFY=FALSE),
-		del =  mcmapply(prepare_cn, del.case, del.control, SIMPLIFY=FALSE)
+		del = mcmapply(prepare_cn, del.case, del.control, SIMPLIFY=FALSE)
 	);
 
 	# fit models for amp and del separately, and for each chromosome
@@ -249,44 +249,5 @@ compare_segs <- function(case, control, params=NULL, hparams=NULL, smooth=TRUE, 
 	);
 	
 	structure(fits, class="cn_gpldiffs")
-}
-
-
-#' Summarize \code{cn_gpldiffs} object.
-#'
-#' @import parallel
-#'
-#' @param object  a \code{cn_gpldiffs} object
-#' @return a \code{list} of \code{data.frame}
-#' @export
-summary.cn_gpldiffs <- function(object, direction=1) {
-	# cn_gpldiffs is organized as a list of lists,
-	# with first level grouping by type (amp vs. del)
-
-	rsets <- lapply(
-		object,
-		function(fset) {
-			mclapply(fset,
-				function(fit) {
-					gpldiff::find_sig_regions(fit$model, fit$data, direction=direction, process=FALSE);
-				}
-			)
-		}
-	);
-
-	regions <- mcmapply(
-		function(rset, type) {
-			d <- gpldiff::process_regions(combine_regions(rset), direction=direction);
-			if (!is.null(d) && nrow(d) > 0) {
-				data.frame(type = type, d)
-			} else {
-				NULL
-			}
-		},
-		rsets, c("Amp", "Del"),
-		SIMPLIFY=FALSE
-	);
-
-	process_cn_regions(rbind(regions$amp, regions$del))
 }
 

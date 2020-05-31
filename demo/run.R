@@ -47,8 +47,8 @@ idx <- unlist(lapply(fits$del, function(x) is(x$model, "gpldiff")));
 fits$del <- fits$del[idx];
 
 # significant regions in LUAD
-regions.luad <- summary(fits);
-filter(regions.luad, end - start + 1 > 2e6, abs(ldiff) > 0.1, fdr < 0.05, n_obs > 10)
+regions.luad <- summary(fits, genome=genome);
+print(filter(regions.luad, end - start + 1 > 2e6, abs(ldiff) > 0.1, fdr < 0.05, n_obs > 10))
 
 qdraw(
 	{
@@ -61,8 +61,8 @@ qdraw(
 )
 
 # significant regions in LUSC
-regions.lusc <- summary(fits, direction=-1);
-filter(regions.lusc, end - start + 1 > 2e6, abs(ldiff) > 0.1, fdr < 0.05, n_obs > 10)
+regions.lusc <- summary(fits, direction=-1, genome=genome);
+print(filter(regions.lusc, end - start + 1 > 2e6, abs(ldiff) > 0.1, fdr < 0.05, n_obs > 10))
 
 qdraw(
 	{

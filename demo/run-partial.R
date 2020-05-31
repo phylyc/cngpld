@@ -34,9 +34,9 @@ fits <- compare_segs(seg.luad.chr, seg.lusc.chr);
 # Examine results ############################################################
 
 # significant regions in LUAD
-regions.luad <- summary(fits);
+regions.luad <- summary(fits, genome=genome);
 if (!is.null(regions.luad)) {
-	filter(regions.luad, end - start + 1 > 2e6, abs(ldiff) > 0.1, fdr < 0.05, n_obs > 10)
+	print(filter(regions.luad, end - start + 1 > 2e6, abs(ldiff) > 0.1, fdr < 0.05, n_obs > 10))
 }
 
 for (ch in chrno) {

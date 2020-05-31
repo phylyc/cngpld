@@ -1,28 +1,63 @@
 library(io)
+library(dplyr)
 
 library(devtools)
 load_all();
 
 #options(mc.cores=1);
 
-control.fname <- "gistic2/tcga-luad/scores.gistic";
-case.fname <- "gistic2/tcga-lusc/scores.gistic";
-out.fname <- filename("bm-luad-bmet_tcga-luad", tag="gpldiff");
+genome <- "hg19";
+case.fn <- "gistic2/tcga-luad/scores.gistic";
+control.fn <- "gistic2/tcga-lusc/scores.gistic";
 
-case <- read_gistic(case.fname);
-control <- read_gistic(control.fname);
+out.fn <- filename("cngpld-gistic2", date=NA);
+fits.fn <- insert(out.fn, tag="luad-vs-lusc", ext="rds");
 
-fits <- compare_gistics(case.fname, control.fname);
-qwrite(fits, insert(out.fname, ext="rds"));
+#chroms <- c("11", "14");
+chroms <- NULL;
 
-results <- summary(fits);
-results.f <- results[results$diff > 0.5 & results$fdr < 0.01, ];
-print(results.f)
+case <- read_gistic(case.fn);
+control <- read_gistic(control.fn);
 
-results.down <- summary(fits, direction=-1);
-results.down.f <- results.down[results.down$diff < -0.5 & results.down$fdr < 0.01, ];
-print(results.down.f)
+if (!is.null(chroms)) {
+	case <- filter(case, chromosome %in% chroms);
+	control <- filter(control, chromosome %in% chroms);
+}
 
-qwrite(results, insert(out.fname, ext="tsv"));
-qwrite(results.down, insert(out.fname, tag="down", ext="tsv"));
+
+fits <- compare_gistics(case, control);
+qwrite(fits, fits.fn);
+
+
+regions.case <- summary(fits, genome=genome);
+regions.case.f <- filter(regions.case, end - start + 1 > 2e6, abs(ldiff) > 0.1, fdr < 0.05, n_obs > 10);
+print(regions.case.f)
+
+qdraw(
+	{
+		with(fits$amp[["14"]],  # NKX2-1 (TFF-1) amplicon
+			plot(model, data, which=c("response", "latent", "odds"), xlab="position (Mbp)")
+		)
+	},
+	width = 5, height = 10,
+	file = insert(out.fn, tag=c("luad", "nkx2-1"), ext="pdf")
+)
+
+
+regions.control <- summary(fits, direction=-1, genome=genome);
+regions.control.f <- filter(regions.control, end - start + 1 > 2e6, abs(ldiff) > 0.1, fdr < 0.05, n_obs > 10);
+print(regions.control.f)
+
+qdraw(
+	{
+		with(fits$amp[["11"]],  # CCND1 amplicon
+			plot(model, data, which=c("response", "latent", "odds"), xlab="position (Mbp)")
+		)
+	},
+	width = 5, height = 10,
+	file = insert(out.fn, tag=c("lusc", "ccnd1"), ext="pdf")
+)
+
+qwrite(regions.case, insert(out.fn, tag=c("sig-regions", "luad"), ext="tsv"));
+qwrite(regions.control, insert(out.fn, tag=c("sig-regions", "lusc"), ext="tsv"));
 

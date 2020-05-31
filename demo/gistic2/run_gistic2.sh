@@ -1,5 +1,10 @@
 #!/bin/sh
 
+# Run GISTIC2 on on input seg file
+
+# Prequisite: gistic2 >= 2.0.23 is available on $PATH
+# gistic2 may be installed with (patefiant)[https://github.com/djhshih/patefiant]
+
 segfile=$1
 outdir=$2
 

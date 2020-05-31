@@ -16,7 +16,7 @@ seg.luad <- read_seg("tcga-luad.seg");
 seg.lusc <- read_seg("tcga-lusc.seg");
 
 # NKX2-1 (TFF-1) amplicon is on chr14
-chrno <- c("14", "19", "22");
+chrno <- c("14", "22");
 
 seg.luad.chr <- seg.luad[seg.luad$chromosome %in% chrno, ];
 seg.lusc.chr <- seg.lusc[seg.lusc$chromosome %in% chrno, ];

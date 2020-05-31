@@ -21,6 +21,7 @@ process_cn_regions <- function(regions) {
 #' @param regions  \code{data.frame} of significant regions
 #' @param padding  padding factor relative to the size of the centromere
 #' @param genome   genome build
+#'                 (see \code{data(centromeres)} for chromosome format)
 #' @return a \code{data.frame} of filtered regions
 #' @export
 filter_centromere_regions <- function(regions, padding=1, genome=c("hg19", "hg38")) {

@@ -2,10 +2,14 @@
 #'
 #' @import parallel
 #'
-#' @param object  a \code{cn_gpldiffs} object
+#' @param object     a \code{cn_gpldiffs} object
 #' @param direction  comparison direction:
 #'                    1 indicates case vs. control,
 #'                   -1 indicates control vs. case.
+#' @param genome     genome build to use for filtering centromeres;
+#'                   \code{NA} suppresses filtering
+#'                   (see \code{data(centromeres)} for supported builds
+#'                   and chromosome format)
 #' @return a \code{list} of \code{data.frame}
 #' @export
 summary.cn_gpldiffs <- function(object, direction=1, genome=NA, ...) {

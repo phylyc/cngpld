@@ -39,10 +39,11 @@ if (file.exists(fits.fn)) {
 # Examine results ############################################################
 
 # problematic deletion profiles:
-which(unlist(lapply(fits$del, function(x) ! is(x$model, "gpldiff"))))
+print(which(unlist(lapply(fits$del, function(x) ! is(x$model, "gpldiff")))))
 # chroms 1 11 13 15 17 19 20 22  3  5  7  9
 
 # remove problematic deletion profiles
+fits.orig <- fits;
 idx <- unlist(lapply(fits$del, function(x) is(x$model, "gpldiff")));
 fits$del <- fits$del[idx];
 

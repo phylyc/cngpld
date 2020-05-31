@@ -1,8 +1,4 @@
 library(io)
-library(dplyr)
-library(ggplot2)
-library(scales)
-library(ggrepel)
 
 library(devtools)
 load_all();
@@ -36,7 +32,8 @@ fits <- compare_segs(seg.luad.chr, seg.lusc.chr);
 # significant regions in LUAD
 regions.luad <- summary(fits, genome=genome);
 if (!is.null(regions.luad)) {
-	print(filter(regions.luad, end - start + 1 > 2e6, abs(ldiff) > 0.1, fdr < 0.05, n_obs > 10))
+	idx <- with(regions.luad, end - start + 1 > 2e6, abs(ldiff) > 0.1, fdr < 0.05, n_obs > 10);
+	print(regions.luad[idx, ]);
 }
 
 for (ch in chrno) {

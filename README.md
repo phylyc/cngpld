@@ -13,7 +13,7 @@ Generated the required data for the package by
 
 ```
 cd data-raw
-Rscript *.R
+./build.sh
 ```
 
 Then, this package may be installed using `devtools`.

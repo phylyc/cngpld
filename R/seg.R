@@ -41,6 +41,22 @@ write_seg <- function(x, file, ...) {
 	write.table(x, file, row.names=FALSE, col.names=TRUE, quote=FALSE, sep="\t", ...)
 }
 
+# Median center each chromosome for each sample
+median_center_seg <- function(seg) {
+	segs <- split(seg, list(seg$sample, seg$chromosome));
+	d <- do.call(rbind,
+		lapply(segs,
+			function(s) {
+				s$logr <- s$logr - median(s$logr);
+				s
+			}
+		)
+	);
+	rownames(d) <- NULL;
+
+	d
+}
+
 #' Convert data.frame of segments to GRanges
 #' 
 #' @import GenomicRanges IRanges GenomeInfoDb
@@ -193,7 +209,7 @@ compare_segs <- function(case, control, params=NULL, hparams=NULL, smooth=TRUE, 
 
 	# seg contains only segments from one chromosome
 	summarize_amp_del <- function(seg) {
-		gr <- seg_to_gr(seg);
+		gr <- seg_to_gr(median_center_seg(seg));
 		d.amp <- summarize_cn(gr, direction=1, cutoff=cutoff);
 		d.del <- summarize_cn(gr, direction=-1, cutoff=cutoff);
 		if (smooth) {

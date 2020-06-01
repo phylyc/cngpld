@@ -18,9 +18,10 @@ seg.lusc.chr <- seg.lusc[seg.lusc$chromosome == chrom, ];
 
 # Run analysis ###############################################################
 
-gr.luad <- seg_to_gr(seg.luad.chr);
+gr.luad <- seg_to_gr(median_center_seg(seg.luad.chr));
 d.amp.luad <- summarize_cn(gr.luad, direction=1, cutoff=0.1);
 d.del.luad <- summarize_cn(gr.luad, direction=-1, cutoff=0.1);
+summary(d.amp.luad$value)
 summary(d.del.luad$value)
 
 gr <- gr.luad;
@@ -71,7 +72,7 @@ print(str(c.amp.luad))
 print(str(c.del.luad))
 
 
-gr.lusc <- seg_to_gr(seg.lusc.chr);
+gr.lusc <- seg_to_gr(median_center_seg(seg.lusc.chr));
 
 d.amp.lusc <- summarize_cn(gr.lusc, cutoff=0.1);
 summary(d.amp.lusc$value)

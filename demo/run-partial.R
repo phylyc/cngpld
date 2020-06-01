@@ -47,8 +47,7 @@ for (ch in chrno) {
 	qdraw(
 		{
 			with(fits$amp[[ch]],  
-				#plot(model, data, which=c("response", "latent", "odds"), xlab="position (Mbp)")
-				plot(model, data, xlab="position (Mbp)")
+				plot(model, data, which=c("response", "latent", "odds"), xlab="position (Mbp)")
 			)
 		},
 		width = 5, height = 10,

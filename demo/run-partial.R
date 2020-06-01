@@ -12,7 +12,7 @@ seg.luad <- read_seg("tcga-luad.seg");
 seg.lusc <- read_seg("tcga-lusc.seg");
 
 # NKX2-1 (TFF-1) amplicon is on chr14
-chrno <- c("14", "22");
+chrno <- c("11", "14");
 
 seg.luad.chr <- seg.luad[seg.luad$chromosome %in% chrno, ];
 seg.lusc.chr <- seg.lusc[seg.lusc$chromosome %in% chrno, ];
@@ -32,15 +32,23 @@ fits <- compare_segs(seg.luad.chr, seg.lusc.chr);
 # significant regions in LUAD
 regions.luad <- summary(fits, genome=genome);
 if (!is.null(regions.luad)) {
-	idx <- with(regions.luad, end - start + 1 > 2e6, abs(ldiff) > 0.1, fdr < 0.05, n_obs > 10);
+	idx <- with(regions.luad, end - start + 1 > 2e6 & abs(ldiff) > 0.15 & fdr < 0.05 & n_obs > 10);
 	print(regions.luad[idx, ]);
+}
+
+# significant regions in LUSC
+regions.lusc <- summary(fits, direction=-1, genome=genome);
+if (!is.null(regions.lusc)) {
+	idx <- with(regions.lusc, end - start + 1 > 2e6 & abs(ldiff) > 0.15 & fdr < 0.05 & n_obs > 10);
+	print(regions.lusc[idx, ]);
 }
 
 for (ch in chrno) {
 	qdraw(
 		{
 			with(fits$amp[[ch]],  
-				plot(model, data, which=c("response", "latent", "odds"), xlab="position (Mbp)")
+				#plot(model, data, which=c("response", "latent", "odds"), xlab="position (Mbp)")
+				plot(model, data, xlab="position (Mbp)")
 			)
 		},
 		width = 5, height = 10,

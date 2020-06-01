@@ -49,7 +49,7 @@ fits$del <- fits$del[idx];
 
 # significant regions in LUAD
 regions.luad <- summary(fits, genome=genome);
-print(filter(regions.luad, end - start + 1 > 2e6, abs(ldiff) > 0.1, fdr < 0.05, n_obs > 10))
+print(filter(regions.luad, end - start + 1 > 2e6, abs(ldiff) > 0.15, fdr < 0.05, n_obs > 10))
 
 qdraw(
 	{
@@ -63,7 +63,7 @@ qdraw(
 
 # significant regions in LUSC
 regions.lusc <- summary(fits, direction=-1, genome=genome);
-print(filter(regions.lusc, end - start + 1 > 2e6, abs(ldiff) > 0.1, fdr < 0.05, n_obs > 10))
+print(filter(regions.lusc, end - start + 1 > 2e6, abs(ldiff) > 0.15, fdr < 0.05, n_obs > 10))
 
 qdraw(
 	{

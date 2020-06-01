@@ -77,7 +77,7 @@ mean_cn_at_position <- function(gr, pos, direction, cutoff) {
 	idx2 <- logr > cutoff;
 
 	if (sum(idx2) > 0) {
-		sum(logr[idx2]) / length(logr)
+		sum(exp(logr[idx2])) / length(logr)
 	} else {
 		0
 	}
@@ -114,7 +114,7 @@ summarize_cn <- function(gr, direction=1, cutoff=0.1) {
 #'                    all other runs will be collapsed to the two end points
 #' @return \code{cn_summary} object
 #' @export
-collapse_runs <- function(d, digits=2, max.len=2e6) {
+collapse_runs <- function(d, digits=3, max.len=2e6) {
 	# get repeated runs
 	r <- rle(round(d$value, digits=digits));
 

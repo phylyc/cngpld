@@ -75,6 +75,7 @@ qdraw(
 	file = "cngpld_lusc_ccnd1.pdf"
 )
 
+with(fits$amp[["6"]], plot(model, data))   # chr6p arm
 with(fits$amp[["3"]], plot(model, data))   # chr3q arm
 with(fits$amp[["2"]], plot(model, data))   # chr2q amplicon
 with(fits$amp[["9"]], plot(model, data))   # chr9p amplicon

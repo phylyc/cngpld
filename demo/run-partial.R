@@ -32,14 +32,14 @@ fits <- compare_segs(seg.luad.chr, seg.lusc.chr);
 # significant regions in LUAD
 regions.luad <- summary(fits, genome=genome);
 if (!is.null(regions.luad)) {
-	idx <- with(regions.luad, end - start + 1 > 2e6 & abs(ldiff) > 0.15 & fdr < 0.05 & n_obs > 10);
+	idx <- with(regions.luad, end - start + 1 > 2e6 & abs(ldiff) > 0.10 & fdr < 0.05 & n_obs > 10);
 	print(regions.luad[idx, ]);
 }
 
 # significant regions in LUSC
 regions.lusc <- summary(fits, direction=-1, genome=genome);
 if (!is.null(regions.lusc)) {
-	idx <- with(regions.lusc, end - start + 1 > 2e6 & abs(ldiff) > 0.15 & fdr < 0.05 & n_obs > 10);
+	idx <- with(regions.lusc, end - start + 1 > 2e6 & abs(ldiff) > 0.10 & fdr < 0.05 & n_obs > 10);
 	print(regions.lusc[idx, ]);
 }
 

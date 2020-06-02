@@ -10,12 +10,12 @@
 #'                   \code{NA} suppresses filtering
 #'                   (see \code{data(centromeres)} for supported builds
 #'                   and chromosome format)
-#' @param ...        other parameters passed to underlying functions:
-#'                   \code{gpldiff::find_sig_regions},
-#'                   \code{cngpld::filter_centromere_regions}
+#' @param lodds.cut  initial log posterior odds threshold for
+#'                   \code{gpldiff::find_sig_regions}
+#' @param ...        other parameters passed to underlying functions
 #' @return a \code{list} of \code{data.frame}
 #' @export
-summary.cn_gpldiffs <- function(object, direction=1, genome=NA, ...) {
+summary.cn_gpldiffs <- function(object, direction=1, genome=NA, lodds.cut=10, ...) {
 	# cn_gpldiffs is organized as a list of lists,
 	# with first level grouping by type (amp vs. del)
 
@@ -24,7 +24,9 @@ summary.cn_gpldiffs <- function(object, direction=1, genome=NA, ...) {
 		function(fset) {
 			mclapply(fset,
 				function(fit) {
-					gpldiff::find_sig_regions(fit$model, fit$data, direction=direction, process=FALSE, ...);
+					gpldiff::find_sig_regions(
+						fit$model, fit$data, direction=direction, process=FALSE, lodds.cut=lodds.cut, ...
+					);
 				}
 			)
 		}

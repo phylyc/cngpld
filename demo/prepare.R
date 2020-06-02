@@ -4,6 +4,9 @@ load_all()
 seg <- read_seg("tcga-pancan.seg");
 tss <- read.table("tss.tsv", sep="\t", header=TRUE);
 
+# rename chrX
+seg$chromosome[seg$chromosome == "23"] <- "X";
+
 # collect LUAD samples
 code.luad <- as.character(tss$code[tss$study_name == "Lung adenocarcinoma"]);
 seg.luad <- do.call(rbind, lapply(code.luad,

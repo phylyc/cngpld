@@ -12,10 +12,10 @@ seg.lusc <- read_seg("tcga-lusc.seg");
 seg.luad$chromosome[seg.luad$chromosome == "23"] <- "X";
 seg.lusc$chromosome[seg.lusc$chromosome == "23"] <- "X";
 
-chrom <- "3";
+#chrom <- "3";
 #chrom <- "5";
 
-#chrom <- "14";
+chrom <- "14";
 #chrom <- "11";
 
 seg.luad.chr <- seg.luad[seg.luad$chromosome == chrom, ];
@@ -27,17 +27,15 @@ cutoff <- 0.5;
 # Run analysis ###############################################################
 
 
-#seg2 <- mark_chromosome_arm_seg(seg.luad, genome);
-seg2 <- split_chromosome_arm_seg(seg.luad, genome);
-
-#seg2 <- wmean_center_arm_seg(seg.luad.chr, genome);
+seg.luad.chr <- split_chromosome_arm_seg(seg.luad.chr, genome);
+seg.lusc.chr <- split_chromosome_arm_seg(seg.lusc.chr, genome);
 
 
 #gr.luad <- seg_to_gr(seg.luad.chr);
 #gr.luad <- seg_to_gr(median_center_seg(seg.luad.chr));
-#gr.luad <- seg_to_gr(wmean_center_seg(seg.luad.chr));
+gr.luad <- seg_to_gr(wmean_center_seg(seg.luad.chr));
 #gr.luad <- seg_to_gr(wmean_center_arm_seg(seg.luad.chr, genome));
-gr.luad <- seg_to_gr(wmean_center_seg(split_chromosome_arm_seg(seg.luad.chr, genome)));
+#gr.luad <- seg_to_gr(wmean_center_seg(split_chromosome_arm_seg(seg.luad.chr, genome)));
 
 d.amp.luad <- summarize_cn(gr.luad, direction=1, cutoff=cutoff);
 d.del.luad <- summarize_cn(gr.luad, direction=-1, cutoff=cutoff);
@@ -101,9 +99,9 @@ print(str(c.del.luad))
 
 #gr.lusc <- seg_to_gr(seg.lusc.chr);
 #gr.lusc <- seg_to_gr(median_center_seg(seg.lusc.chr));
-#gr.lusc <- seg_to_gr(wmean_center_seg(seg.lusc.chr));
+gr.lusc <- seg_to_gr(wmean_center_seg(seg.lusc.chr));
 #gr.lusc <- seg_to_gr(wmean_center_arm_seg(seg.lusc.chr, genome));
-gr.lusc <- seg_to_gr(wmean_center_seg(split_chromosome_arm_seg(seg.lusc.chr, genome)));
+#gr.lusc <- seg_to_gr(wmean_center_seg(split_chromosome_arm_seg(seg.lusc.chr, genome)));
 
 d.amp.lusc <- summarize_cn(gr.lusc, direction=1, cutoff=cutoff);
 summary(d.amp.lusc$value)

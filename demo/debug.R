@@ -22,6 +22,7 @@ seg.luad.chr <- seg.luad[seg.luad$chromosome == chrom, ];
 seg.lusc.chr <- seg.lusc[seg.lusc$chromosome == chrom, ];
 
 cutoff <- 0.5;
+res <- 100;
 
 
 # Run analysis ###############################################################
@@ -82,8 +83,8 @@ s.amp.luad$value <- as.numeric(smooth(smooth(s.amp.luad$value)));
 s.del.luad <- d.del.luad;
 s.del.luad$value <- as.numeric(smooth(smooth(s.del.luad$value)));
 
-c.amp.luad <- collapse_runs(s.amp.luad);
-c.del.luad <- collapse_runs(s.del.luad);
+c.amp.luad <- collapse_runs(s.amp.luad, res);
+c.del.luad <- collapse_runs(s.del.luad, res);
 
 with(d.amp.luad, plot(position, value, type="l"))
 with(s.amp.luad, lines(position, value, col="royalblue"))
@@ -111,11 +112,11 @@ summary(d.del.lusc$value)
 
 s.amp.lusc <- d.amp.lusc
 s.amp.lusc$value <- as.numeric(smooth(smooth(s.amp.lusc$value)));
-c.amp.lusc <- collapse_runs(s.amp.lusc);
+c.amp.lusc <- collapse_runs(s.amp.lusc, res);
 
 s.del.lusc <- d.del.lusc
 s.del.lusc$value <- as.numeric(smooth(smooth(s.del.lusc$value)));
-c.del.lusc <- collapse_runs(s.del.lusc);
+c.del.lusc <- collapse_runs(s.del.lusc, res);
 
 with(d.amp.lusc, plot(position, value, type="l"))
 with(s.amp.lusc, lines(position, value, col="royalblue"))

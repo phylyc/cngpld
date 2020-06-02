@@ -41,71 +41,6 @@ write_seg <- function(x, file, ...) {
 	write.table(x, file, row.names=FALSE, col.names=TRUE, quote=FALSE, sep="\t", ...)
 }
 
-# mark whether each segment spans each arm of the chromosome
-mark_chromosome_arm_seg <- function(seg, genome, padding=1) {
-	cens <- get_padded_centromere_regions(genome, padding);
-
-	idx <- match(seg$chromosome, cens$chromosome);
-	seg$p_arm <- seg$start < cens$start[idx];
-	seg$q_arm <- seg$end > cens$end[idx];
-
-	seg
-}
-
-# split chromosomes into chromosome arms,
-# splitting segments as necessary
-split_chromosome_arm_seg <- function(seg, genome, padding=1) {
-	if (is.null(seg) || nrow(seg) == 0) return(seg);
-
-	cens <- get_padded_centromere_regions(genome, padding);
-
-	idx <- match(seg$chromosome, cens$chromosome);
-
-	p.arm <- seg$start < cens$start[idx];
-	q.arm <- seg$end > cens$end[idx];
-
-	p.arm.only <- p.arm & !q.arm;
-	q.arm.only <- q.arm & !p.arm;
-	
-	# segments that only span p arms
-	seg.p <- seg[p.arm & !q.arm, ];
-	if (nrow(seg.p) > 0) {
-		# right-truncate segments at the centromere
-		seg.p$end <- pmin(seg.p$end, cens$start[match(seg.p$chromosome, cens$chromosome)] - 1);
-		seg.p$chromosome <- paste0(seg.p$chromosome, "p");
-	}
-
-	# segments that only span q arms
-	seg.q <- seg[q.arm & !p.arm, ];
-	if (nrow(seg.q) > 0) {
-		# left-truncate segments at the centromere
-		seg.q$start <- pmax(seg.q$start, cens$end[match(seg.q$chromosome, cens$chromosome)] + 1);
-		seg.q$chromosome <- paste0(seg.q$chromosome, "q");
-	}
-
-	# segments that span both p and q arms
-	both.arm <- p.arm & q.arm;
-
-	seg.bp <- seg[both.arm, ];
-	if (nrow(seg.bp) > 0) {
-		# right-truncate segments at the centromere
-		seg.bp$end <- pmin(seg.bp$end, cens$start[match(seg.bp$chromosome, cens$chromosome)] - 1);
-		seg.bp$chromosome <- paste0(seg.bp$chromosome, "p");
-	}
-
-	seg.bq <- seg[both.arm, ];
-	if (nrow(seg.bq) > 0) {
-		# left-truncate segments at the centromere
-		seg.bq$start <- pmax(seg.bq$start, cens$end[match(seg.bq$chromosome, cens$chromosome)] + 1);
-		seg.bq$chromosome <- paste0(seg.bq$chromosome, "q");
-	}
-
-	seg2 <- rbind(seg.p, seg.bp, seg.q, seg.bq);
-	seg2 <- with(seg2, seg2[order(sample, chromosome, start), ]);
-
-	seg2	
-}
-
 # Median center each chromosome for each sample
 median_center_seg <- function(seg) {
 	segs <- split(seg, list(seg$sample, seg$chromosome));
@@ -180,7 +115,7 @@ wmean_center_arm_seg <- function(seg, genome) {
 #' @import GenomicRanges IRanges GenomeInfoDb
 #'
 #' @param seg     \code{data.frame} containing log ratios
-#' @param genome  genome build (e.g. hg19)
+#' @param genome  genome build
 #' @export
 seg_to_gr <- function(seg, genome=NA) {
 	chroms <- as.character(seg$chromosome);
@@ -249,7 +184,9 @@ summarize_cn <- function(gr, direction, cutoff) {
 #'                    all other runs will be collapsed to the two end points
 #' @return \code{cn_summary} object
 #' @export
-collapse_runs <- function(d, res=100, max.len=2e6) {
+collapse_runs <- function(d, res, max.len=2e6) {
+	if (res <= 0) return(d);
+
 	# get repeated runs
 	r <- rle(round(d$value * res) / res);
 
@@ -293,6 +230,11 @@ collapse_runs <- function(d, res=100, max.len=2e6) {
 #' data as log ratios. The column names must be:
 #' \code{sample, chromosome, start, end, nprobes, logr}.
 #'
+#' Results will be organized by chromosome arms and this
+#' function will run faster if \code{genome} build is provided.
+#' See \code{data(centromeres)} for supported genomes.
+#' The chromosome nomenclature must match the target genome.
+#'
 #' @import parallel gpldiff
 #'
 #' @param case     seg file name for the case cohort,
@@ -301,14 +243,19 @@ collapse_runs <- function(d, res=100, max.len=2e6) {
 #'                 or \code{data.frame}
 #' @param param    initial parameter values to \code{gpldiff()}
 #' @param hparams  hyperparameter values to \code{gpldiff()}
+#' @param cn.cut   absolute threshold for copy-number log ratio
 #' @param smooth   whether to median smooth the copy-number data
-#' @param collapse whether to collapse runs of repeats (improves speed)
-#' @param cutoff   absolute threshold for copy-number log ratio
+#' @param cn.res   copy-number resolution; if value is positive, collapse 
+#'                 runs of repeats (which improves speed) while preserving 
+#'                 the target resolution
+#' @param genome   genome build
 #' @param verbose  verbosity level; none: 0, info: 1, debug: 2
 #' @param ...      other parameters to \code{gpldiff()}
 #' @return a list of \code{gpldiff} objects
 #' @export
-compare_segs <- function(case, control, params=NULL, hparams=NULL, smooth=TRUE, collapse=TRUE, cutoff=0.5, verbose=1, ...) {
+compare_segs <- function(case, control, params=NULL, hparams=NULL,
+	cn.cut=0.5, smooth=TRUE, cn.res=100, genome=NA, verbose=1, ...
+) {
 	
 	if (is.character(case)) {
 		case <- read_seg(case);
@@ -322,25 +269,26 @@ compare_segs <- function(case, control, params=NULL, hparams=NULL, smooth=TRUE, 
 		hparams <- default_hparams();
 	}
 
+	if (!is.na(genome)) {
+		case <- split_chromosome_arm_seg(case, genome);
+		control <- split_chromosome_arm_seg(control, genome);
+	}
+
 	# split by chromosome
 	case.split <- split(case, list(chromosome = case$chromosome));
 	control.split <- split(control, list(chromosome = control$chromosome));
 
 	# seg contains only segments from one chromosome
 	summarize_amp_del <- function(seg) {
-		#gr <- seg_to_gr(median_center_seg(seg));
-		#gr <- seg_to_gr(seg);
-		gr <- seg_to_gr(wmean_center_seg(seg));
-		d.amp <- summarize_cn(gr, direction=1, cutoff=cutoff);
-		d.del <- summarize_cn(gr, direction=-1, cutoff=cutoff);
+		gr <- seg_to_gr(wmean_center_seg(seg), genome);
+		d.amp <- summarize_cn(gr, direction=1, cutoff=cn.cut);
+		d.del <- summarize_cn(gr, direction=-1, cutoff=cn.cut);
 		if (smooth) {
 			d.amp$value <- as.numeric(smooth(d.amp$value));
 			d.del$value <- as.numeric(smooth(d.del$value));
 		}
-		if (collapse) {
-			d.amp <- collapse_runs(d.amp);
-			d.del <- collapse_runs(d.del);
-		}
+		d.amp <- collapse_runs(d.amp, cn.res);
+		d.del <- collapse_runs(d.del, cn.res);
 		list(
 			amp = d.amp,
 			del = d.del

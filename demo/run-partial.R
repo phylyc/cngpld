@@ -24,13 +24,13 @@ seg.lusc.chr <- seg.lusc[seg.lusc$chromosome %in% chrno, ];
 # on a single-thread of a Core i7 CPU @ 2.93GHz
 
 #options(mc.cores=1);
-fits <- compare_segs(seg.luad.chr, seg.lusc.chr);
+fits <- compare_segs(seg.luad.chr, seg.lusc.chr, genome=genome);
 
 
 # Examine results ############################################################
 
 # significant regions in LUAD
-regions.luad <- summary(fits, genome=genome);
+regions.luad <- summary(fits, direction=1, genome=genome);
 if (!is.null(regions.luad)) {
 	idx <- with(regions.luad, end - start + 1 > 1e6 & abs(ldiff) > 0.15 & fdr < 0.05 & n_obs > 10);
 	print(regions.luad[idx, ]);
@@ -43,7 +43,7 @@ if (!is.null(regions.lusc)) {
 	print(regions.lusc[idx, ]);
 }
 
-for (ch in chrno) {
+for (ch in names(fits$amp)) {
 	qdraw(
 		{
 			with(fits$amp[[ch]],  

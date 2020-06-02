@@ -41,6 +41,27 @@ write_seg <- function(x, file, ...) {
 	write.table(x, file, row.names=FALSE, col.names=TRUE, quote=FALSE, sep="\t", ...)
 }
 
+set_chromosome_arm_seg <- function(seg, genome, padding=1) {
+	cens <- get_padded_centromere_regions(genome, padding);
+
+	idx <- match(seg$chromosome, cens$chromosome);
+
+	seg$p_arm <- seg$start < cens$start[idx];
+	seg$q_arm <- seg$end > cens$end[idx];
+
+	# proportion overlap =
+	#   max(0, (min(e1, e2) - max(s1, s2) + 1) / (e2 - s2 + 1))
+	# the outermost max is to prevent negative values, which occurs 
+	#   when there is no overlap
+
+	# p arm spans [1, cen_start]
+	#seg$p_arm <- pmax(0, (pmin(seg$end, cens$start[idx]) - seg$start + 1) / (seg$end - seg$start + 1));
+	# q arm spans [cen_end + 1, chrom_end]
+	#seg$q_arm <- pmax(0, (seg$end - pmax(seg$start, cens$end[idx]+1) + 1) / (seg$end - seg$start + 1));
+
+	seg
+}
+
 # Median center each chromosome for each sample
 median_center_seg <- function(seg) {
 	segs <- split(seg, list(seg$sample, seg$chromosome));
@@ -57,6 +78,7 @@ median_center_seg <- function(seg) {
 	d
 }
 
+# center by substract overall mean of chromosome
 wmean_center_seg <- function(seg) {
 	segs <- split(seg, list(seg$sample, seg$chromosome));
 	d <- do.call(rbind,
@@ -65,6 +87,48 @@ wmean_center_seg <- function(seg) {
 				w <- s$end - s$start + 1;
 				w <- w / sum(w);
 				m <- sum(w * s$logr);
+				s$logr <- s$logr - m;
+				s
+			}
+		)
+	);
+	rownames(d) <- NULL;
+
+	d
+}
+
+# center by subtracting overall mean of chromosome arm
+wmean_center_arm_seg <- function(seg, genome) {
+	seg <- set_chromosome_arm_seg(seg, genome);
+
+	segs <- split(seg, list(seg$sample, seg$chromosome));
+	d <- do.call(rbind,
+		lapply(segs,
+			function(s) {
+				w <- s$end - s$start + 1;
+				x <- w * s$logr;
+				m.w <- sum(x) / sum(w);
+				p.arm <- s$p_arm;
+				q.arm <- s$q_arm;
+				#p.arm <- s$p_arm > 0;
+				#q.arm <- s$q_arm > 0;
+				m.p <- sum(x[p.arm]) / sum(w[p.arm]);
+				m.q <- sum(x[q.arm]) / sum(w[q.arm]);
+				#m.p <- 0;
+				#m.q <- 0;
+				# use whole chromosome mean if segment spans both arms
+				# use p arm if segment only spans p arm
+				# use q arm if segment only spans q arm
+				# use 0 if segment spans neither arm
+				m <- ifelse(s$p_arm,
+					ifelse(s$q_arm, m.w, m.p),
+					ifelse(s$q_arm, m.q, 0)
+				);
+				#total.arm.prop <- s$p_arm + s$q_arm;
+				#m <- ifelse(total.arm.prop > 0,
+				#	(s$p_arm * m.p  +  s$q_arm * m.q) / total.arm.prop,
+				#	0
+				#);
 				s$logr <- s$logr - m;
 				s
 			}

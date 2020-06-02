@@ -28,7 +28,8 @@ ends <- unlist(lapply(cens, function(s) max(s$end)));
 
 y <- data.frame(
 	chromosome = chroms,
-	start = starts,
+	# ensure that coordinates are 1-based
+	start = starts + 1,
 	end = ends
 );
 

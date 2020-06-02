@@ -16,6 +16,20 @@ process_cn_regions <- function(regions) {
 	}
 }
 
+get_padded_centromere_regions <- function(genome=c("hg19", "hg38"), padding=1) {
+	genome <- match.arg(genome);
+
+	# centromere coordinates are stored in 1-based
+	cens <- centromeres[[genome]];
+	cen_sizes <- cens$end - cens$start;
+
+	data.frame(
+		chromosome = cens$chromosome,
+		start = cens$start - padding * cen_sizes,
+		end = cens$end + padding * cen_sizes
+	)
+}
+
 #' Filter out regions that overlap with padded centromere regions
 #'
 #' @param regions  \code{data.frame} of significant regions
@@ -24,18 +38,11 @@ process_cn_regions <- function(regions) {
 #'                 (see \code{data(centromeres)} for chromosome format)
 #' @return a \code{data.frame} of filtered regions
 #' @export
-filter_centromere_regions <- function(regions, padding=1, genome=c("hg19", "hg38")) {
-	genome <- match.arg(genome);
+filter_centromere_regions <- function(regions, genome, padding=1) {
+	cens <- get_padded_centromere_regions(genome, padding)
 
-	# centromere coordinates are stored in 1-based
-	cens <- centromeres[[genome]];
-	cen_chroms <- cens$chromosome;
-	cen_sizes <- cens$end - cens$start;
-	cen_starts <- (cens$start + 1) - padding * cen_sizes;
-	cen_ends <- cens$end + padding * cen_sizes;
-
-	idx <- match(regions$chromosome, cen_chroms);
-	regions[!gpldiff:::overlap(regions$start, regions$end, cen_starts[idx], cen_ends[idx]), , drop=FALSE]
+	idx <- match(regions$chromosome, cens$chromosome);
+	regions[!gpldiff:::overlap(regions$start, regions$end, cens$start[idx], cens$end[idx]), , drop=FALSE]
 }
 
 # combine regions from different chromosomes together

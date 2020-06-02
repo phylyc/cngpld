@@ -49,16 +49,6 @@ set_chromosome_arm_seg <- function(seg, genome, padding=1) {
 	seg$p_arm <- seg$start < cens$start[idx];
 	seg$q_arm <- seg$end > cens$end[idx];
 
-	# proportion overlap =
-	#   max(0, (min(e1, e2) - max(s1, s2) + 1) / (e2 - s2 + 1))
-	# the outermost max is to prevent negative values, which occurs 
-	#   when there is no overlap
-
-	# p arm spans [1, cen_start]
-	#seg$p_arm <- pmax(0, (pmin(seg$end, cens$start[idx]) - seg$start + 1) / (seg$end - seg$start + 1));
-	# q arm spans [cen_end + 1, chrom_end]
-	#seg$q_arm <- pmax(0, (seg$end - pmax(seg$start, cens$end[idx]+1) + 1) / (seg$end - seg$start + 1));
-
 	seg
 }
 
@@ -110,12 +100,8 @@ wmean_center_arm_seg <- function(seg, genome) {
 				m.w <- sum(x) / sum(w);
 				p.arm <- s$p_arm;
 				q.arm <- s$q_arm;
-				#p.arm <- s$p_arm > 0;
-				#q.arm <- s$q_arm > 0;
 				m.p <- sum(x[p.arm]) / sum(w[p.arm]);
 				m.q <- sum(x[q.arm]) / sum(w[q.arm]);
-				#m.p <- 0;
-				#m.q <- 0;
 				# use whole chromosome mean if segment spans both arms
 				# use p arm if segment only spans p arm
 				# use q arm if segment only spans q arm
@@ -124,11 +110,6 @@ wmean_center_arm_seg <- function(seg, genome) {
 					ifelse(s$q_arm, m.w, m.p),
 					ifelse(s$q_arm, m.q, 0)
 				);
-				#total.arm.prop <- s$p_arm + s$q_arm;
-				#m <- ifelse(total.arm.prop > 0,
-				#	(s$p_arm * m.p  +  s$q_arm * m.q) / total.arm.prop,
-				#	0
-				#);
 				s$logr <- s$logr - m;
 				s
 			}

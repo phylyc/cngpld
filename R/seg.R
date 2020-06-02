@@ -41,15 +41,59 @@ write_seg <- function(x, file, ...) {
 	write.table(x, file, row.names=FALSE, col.names=TRUE, quote=FALSE, sep="\t", ...)
 }
 
-set_chromosome_arm_seg <- function(seg, genome, padding=1) {
+# mark whether each segment spans each arm of the chromosome
+mark_chromosome_arm_seg <- function(seg, genome, padding=1) {
 	cens <- get_padded_centromere_regions(genome, padding);
 
 	idx <- match(seg$chromosome, cens$chromosome);
-
 	seg$p_arm <- seg$start < cens$start[idx];
 	seg$q_arm <- seg$end > cens$end[idx];
 
 	seg
+}
+
+# split chromosomes into chromosome arms,
+# splitting segments as necessary
+split_chromosome_arm_seg <- function(seg, genome, padding=1) {
+	cens <- get_padded_centromere_regions(genome, padding);
+
+	idx <- match(seg$chromosome, cens$chromosome);
+
+	p.arm <- seg$start < cens$start[idx];
+	q.arm <- seg$end > cens$end[idx];
+
+	p.arm.only <- p.arm & !q.arm;
+	q.arm.only <- q.arm & !p.arm;
+	
+	# segments that only span p arms
+	seg.p <- seg[p.arm & !q.arm, ];
+	# right-truncate segments at the centromere
+	seg.p$end <- pmin(seg.p$end, cens$start[match(seg.p$chromosome, cens$chromosome)] - 1);
+	seg.p$chromosome <- paste0(seg.p$chromosome, "p");
+
+	# segments that only span q arms
+	seg.q <- seg[q.arm & !p.arm, ];
+	# left-truncate segments at the centromere
+	seg.q$start <- pmax(seg.q$start, cens$end[match(seg.q$chromosome, cens$chromosome)] + 1);
+	seg.q$chromosome <- paste0(seg.q$chromosome, "q");
+
+	# segments that span both p and q arms
+	both.arm <- p.arm & q.arm;
+
+	seg.bp <- seg[both.arm, ];
+	# right-truncate segments at the centromere
+	seg.bp$end <- pmin(seg.bp$end, cens$start[match(seg.bp$chromosome, cens$chromosome)] - 1);
+	seg.bp$chromosome <- paste0(seg.bp$chromosome, "p");
+
+	seg.bq <- seg[both.arm, ];
+	# left-truncate segments at the centromere
+	seg.bq$start <- pmax(seg.bq$start, cens$end[match(seg.bq$chromosome, cens$chromosome)] + 1);
+	seg.bq$chromosome <- paste0(seg.bq$chromosome, "q");
+
+	seg2 <- rbind(seg.p, seg.bp, seg.q, seg.bq);
+	seg2 <- with(seg2, seg2[order(sample, chromosome, start), ]);
+
+	seg2	
 }
 
 # Median center each chromosome for each sample
@@ -77,7 +121,7 @@ wmean_center_seg <- function(seg) {
 				w <- s$end - s$start + 1;
 				w <- w / sum(w);
 				m <- sum(w * s$logr);
-				s$logr <- s$logr - m;
+				s$logr <- s$logr - ifelse(abs(s$logr) > abs(m), m, s$logr);
 				s
 			}
 		)
@@ -89,7 +133,7 @@ wmean_center_seg <- function(seg) {
 
 # center by subtracting overall mean of chromosome arm
 wmean_center_arm_seg <- function(seg, genome) {
-	seg <- set_chromosome_arm_seg(seg, genome);
+	seg <- mark_chromosome_arm_seg(seg, genome);
 
 	segs <- split(seg, list(seg$sample, seg$chromosome));
 	d <- do.call(rbind,
@@ -129,9 +173,9 @@ wmean_center_arm_seg <- function(seg, genome) {
 #' @export
 seg_to_gr <- function(seg, genome=NA) {
 	chroms <- as.character(seg$chromosome);
-	if (!grepl("^chr", chroms[1])) {
-		chroms <- paste0("chr", chroms);
-	}
+	#if (!grepl("^chr", chroms[1])) {
+	#	chroms <- paste0("chr", chroms);
+	#}
 
 	gr <- GRanges(
 		seqnames = chroms,

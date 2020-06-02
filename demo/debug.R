@@ -27,14 +27,17 @@ cutoff <- 0.5;
 # Run analysis ###############################################################
 
 
-seg2 <- set_chromosome_arm_seg(seg.luad, genome);
+#seg2 <- mark_chromosome_arm_seg(seg.luad, genome);
+seg2 <- split_chromosome_arm_seg(seg.luad, genome);
+
 #seg2 <- wmean_center_arm_seg(seg.luad.chr, genome);
 
 
 #gr.luad <- seg_to_gr(seg.luad.chr);
 #gr.luad <- seg_to_gr(median_center_seg(seg.luad.chr));
 #gr.luad <- seg_to_gr(wmean_center_seg(seg.luad.chr));
-gr.luad <- seg_to_gr(wmean_center_arm_seg(seg.luad.chr, genome));
+#gr.luad <- seg_to_gr(wmean_center_arm_seg(seg.luad.chr, genome));
+gr.luad <- seg_to_gr(wmean_center_seg(split_chromosome_arm_seg(seg.luad.chr, genome)));
 
 d.amp.luad <- summarize_cn(gr.luad, direction=1, cutoff=cutoff);
 d.del.luad <- summarize_cn(gr.luad, direction=-1, cutoff=cutoff);
@@ -81,20 +84,16 @@ s.amp.luad$value <- as.numeric(smooth(smooth(s.amp.luad$value)));
 s.del.luad <- d.del.luad;
 s.del.luad$value <- as.numeric(smooth(smooth(s.del.luad$value)));
 
-with(d.amp.luad, plot(position, value, type="l"))
-with(s.amp.luad, lines(position, value, col="royalblue"))
-
-with(d.del.luad, plot(position, value, type="l"))
-with(s.del.luad, lines(position, value, col="royalblue"))
-
 c.amp.luad <- collapse_runs(s.amp.luad);
 c.del.luad <- collapse_runs(s.del.luad);
 
 with(d.amp.luad, plot(position, value, type="l"))
-with(c.amp.luad, lines(position, value, col="royalblue"))
+with(s.amp.luad, lines(position, value, col="royalblue"))
+with(c.amp.luad, lines(position, value, col="firebrick"))
 
 with(d.del.luad, plot(position, value, type="l"))
-with(c.del.luad, lines(position, value, col="royalblue"))
+with(s.del.luad, lines(position, value, col="royalblue"))
+with(c.del.luad, lines(position, value, col="firebrick"))
 
 print(str(c.amp.luad))
 print(str(c.del.luad))
@@ -103,7 +102,8 @@ print(str(c.del.luad))
 #gr.lusc <- seg_to_gr(seg.lusc.chr);
 #gr.lusc <- seg_to_gr(median_center_seg(seg.lusc.chr));
 #gr.lusc <- seg_to_gr(wmean_center_seg(seg.lusc.chr));
-gr.lusc <- seg_to_gr(wmean_center_arm_seg(seg.lusc.chr, genome));
+#gr.lusc <- seg_to_gr(wmean_center_arm_seg(seg.lusc.chr, genome));
+gr.lusc <- seg_to_gr(wmean_center_seg(split_chromosome_arm_seg(seg.lusc.chr, genome)));
 
 d.amp.lusc <- summarize_cn(gr.lusc, direction=1, cutoff=cutoff);
 summary(d.amp.lusc$value)
@@ -120,10 +120,12 @@ s.del.lusc$value <- as.numeric(smooth(smooth(s.del.lusc$value)));
 c.del.lusc <- collapse_runs(s.del.lusc);
 
 with(d.amp.lusc, plot(position, value, type="l"))
-with(c.amp.lusc, lines(position, value, col="royalblue"))
+with(s.amp.lusc, lines(position, value, col="royalblue"))
+with(c.amp.lusc, lines(position, value, col="firebrick"))
 
 with(d.del.lusc, plot(position, value, type="l"))
-with(c.del.lusc, lines(position, value, col="royalblue"))
+with(s.del.lusc, lines(position, value, col="royalblue"))
+with(c.del.lusc, lines(position, value, col="firebrick"))
 
 print(str(c.amp.lusc))
 print(str(c.del.lusc))

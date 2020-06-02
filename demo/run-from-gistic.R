@@ -30,7 +30,7 @@ qwrite(fits, fits.fn);
 
 
 regions.case <- summary(fits, genome=genome);
-regions.case.f <- filter(regions.case, end - start + 1 > 2e6, abs(ldiff) > 0.1, fdr < 0.05, n_obs > 10);
+regions.case.f <- filter(regions.case, end - start + 1 > 1e6, abs(ldiff) > 0.15, fdr < 0.05, n_obs > 10);
 print(regions.case.f)
 
 qdraw(
@@ -45,7 +45,7 @@ qdraw(
 
 
 regions.control <- summary(fits, direction=-1, genome=genome);
-regions.control.f <- filter(regions.control, end - start + 1 > 2e6, abs(ldiff) > 0.1, fdr < 0.05, n_obs > 10);
+regions.control.f <- filter(regions.control, end - start + 1 > 1e6, abs(ldiff) > 0.15, fdr < 0.05, n_obs > 10);
 print(regions.control.f)
 
 qdraw(

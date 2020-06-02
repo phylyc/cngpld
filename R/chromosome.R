@@ -28,6 +28,14 @@ split_chromosome_arm_seg <- function(seg, genome, padding=1) {
 
 	cens <- get_padded_centromere_regions(genome, padding);
 
+	# remove unknown chromosomes
+	idx <- which(! seg$chromosome %in% as.character(cens$chromosome));
+	if (length(idx) > 0) {
+		warning("Unknown chromosomes are removed: ",
+			paste(unique(seg$chromosome[idx]) ,sep=", "))
+		seg <- seg[-idx, ];
+	}
+
 	idx <- match(seg$chromosome, cens$chromosome);
 
 	p.arm <- seg$start < cens$start[idx];

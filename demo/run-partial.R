@@ -11,7 +11,8 @@ genome <- "hg19";
 seg.luad <- read_seg("tcga-luad.seg");
 seg.lusc <- read_seg("tcga-lusc.seg");
 
-# NKX2-1 (TFF-1) amplicon is on chr14
+# NKX2-1 (TFF-1) amplicon is on chr14q
+# CCND1 amplicon is on chr11q
 chrno <- c("11", "14");
 
 seg.luad.chr <- seg.luad[seg.luad$chromosome %in% chrno, ];
@@ -23,21 +24,21 @@ seg.lusc.chr <- seg.lusc[seg.lusc$chromosome %in% chrno, ];
 # complete analysis of chr14 took 15 min
 # on a single-thread of a Core i7 CPU @ 2.93GHz
 
-#options(mc.cores=1);
+options(mc.cores=1);
 fits <- compare_segs(seg.luad.chr, seg.lusc.chr, genome=genome);
 
 
 # Examine results ############################################################
 
 # significant regions in LUAD
-regions.luad <- summary(fits, direction=1, genome=genome);
+regions.luad <- summary(fits, direction=1);
 if (!is.null(regions.luad)) {
 	idx <- with(regions.luad, end - start + 1 > 1e6 & abs(ldiff) > 0.15 & fdr < 0.05 & n_obs > 10);
 	print(regions.luad[idx, ]);
 }
 
 # significant regions in LUSC
-regions.lusc <- summary(fits, direction=-1, genome=genome);
+regions.lusc <- summary(fits, direction=-1);
 if (!is.null(regions.lusc)) {
 	idx <- with(regions.lusc, end - start + 1 > 1e6 & abs(ldiff) > 0.15 & fdr < 0.05 & n_obs > 10);
 	print(regions.lusc[idx, ]);

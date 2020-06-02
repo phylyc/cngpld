@@ -8,7 +8,7 @@ library(devtools)
 load_all();
 
 
-# Read data #################################################################
+# Configurations #############################################################
 
 genome <- "hg19";
 fits.fn <- "cngpld_luad-vs-lusc.rds";
@@ -29,8 +29,8 @@ if (file.exists(fits.fn)) {
 	# complete analysis took 49595 s = 13.8 h
 	# on a single-thread of a Core i7 CPU @ 2.93GHz
 
-	#options(mc.cores=1);
-	fits <- compare_segs(seg.luad, seg.lusc, genome);
+	options(mc.cores=1);
+	fits <- compare_segs(seg.luad, seg.lusc, genome=genome);
 
 	qwrite(fits, fits.fn);
 }
@@ -39,6 +39,7 @@ if (file.exists(fits.fn)) {
 # Examine results ############################################################
 
 # problematic deletion profiles:
+cat("Failed profiles:\n")
 print(which(unlist(lapply(fits$del, function(x) ! is(x$model, "gpldiff")))))
 # chroms 1 11 13 15 17 19 20 22  3  5  7  9
 

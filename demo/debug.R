@@ -9,13 +9,14 @@ genome <- "hg19";
 seg.luad <- read_seg("tcga-luad.seg");
 seg.lusc <- read_seg("tcga-lusc.seg");
 
-seg.luad$chromosome[seg.luad$chromosome == "23"] <- "X";
-seg.lusc$chromosome[seg.lusc$chromosome == "23"] <- "X";
+#seg.luad$chromosome[seg.luad$chromosome == "23"] <- "X";
+#seg.lusc$chromosome[seg.lusc$chromosome == "23"] <- "X";
 
 #chrom <- "3";
 #chrom <- "5";
 
 chrom <- "14";
+#chrom <- "14";
 #chrom <- "11";
 
 seg.luad.chr <- seg.luad[seg.luad$chromosome == chrom, ];
@@ -27,10 +28,10 @@ res <- 100;
 
 # Run analysis ###############################################################
 
+#seg2 <- split_chromosome_arm_seg(seg.luad, genome);
 
 seg.luad.chr <- split_chromosome_arm_seg(seg.luad.chr, genome);
 seg.lusc.chr <- split_chromosome_arm_seg(seg.lusc.chr, genome);
-
 
 #gr.luad <- seg_to_gr(seg.luad.chr);
 #gr.luad <- seg_to_gr(median_center_seg(seg.luad.chr));

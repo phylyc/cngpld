@@ -49,7 +49,7 @@ fits$del <- fits$del[idx];
 
 # significant regions in LUAD
 regions.luad <- summary(fits, genome=genome);
-print(filter(regions.luad, end - start + 1 > 2e6, abs(ldiff) > 0.10, fdr < 0.05, n_obs > 10))
+print(filter(regions.luad, end - start + 1 > 1e6, abs(ldiff) > 0.15, fdr < 0.05, n_obs > 10))
 
 qdraw(
 	{
@@ -63,7 +63,7 @@ qdraw(
 
 # significant regions in LUSC
 regions.lusc <- summary(fits, direction=-1, genome=genome);
-print(filter(regions.lusc, end - start + 1 > 2e6, abs(ldiff) > 0.10, fdr < 0.05, n_obs > 10))
+print(filter(regions.lusc, end - start + 1 > 1e6, abs(ldiff) > 0.15, fdr < 0.05, n_obs > 10))
 
 qdraw(
 	{
@@ -75,13 +75,14 @@ qdraw(
 	file = "cngpld_lusc_ccnd1.pdf"
 )
 
-with(fits$amp[["6"]], plot(model, data))   # chr6p arm
 with(fits$amp[["3"]], plot(model, data))   # chr3q arm
-with(fits$amp[["2"]], plot(model, data))   # chr2q amplicon
-with(fits$amp[["9"]], plot(model, data))   # chr9p amplicon
-with(fits$del[["2"]], plot(model, data))   # LRP1B deletion
-#with(fits$del[["3"]], plot(model, data))   # chr3q deletion
-#with(fits$del[["5"]], plot(model, data))   # chr3p deletion
+with(fits$amp[["19"]], plot(model, data))  # chr19q arm
+with(fits$amp[["5"]], plot(model, data))   # chr5p arm
+
+with(fits$del[["1"]], plot(model, data))   # LRP1B deletion
+with(fits$del[["3"]], plot(model, data))   # chr3p arm
+with(fits$del[["9"]], plot(model, data))   # CDKN2A/B deletion
+with(fits$del[["8"]], plot(model, data))   # CSMD1 deletion
 
 qwrite(regions.luad, "cngpld_sig-regions_luad.tsv");
 qwrite(regions.lusc, "cngpld_sig-regions_lusc.tsv");
@@ -102,14 +103,14 @@ regions.all <- rbind(
 	data.frame(regions.lusc, group="control")
 );
 regions.all$group <- factor(regions.all$group, levels=c("control", "case", "NS"));
-idx <- with(regions.all, end - start + 1 > 2e6 & abs(ldiff) > 0.15 & fdr < 0.05 & n_obs > 10);
+idx <- with(regions.all, end - start + 1 > 1e6 & abs(ldiff) > 0.15 & fdr < 0.05 & n_obs > 10);
 regions.all$keep <- 0.75;
 regions.all$keep[idx] <- 1.0;
 regions.all$group[!idx] <- "NS";
 
 regions.all$gene <- NA;
-regions.all$gene[regions.all$start_idx == 568] <- "CCND1";
-regions.all$gene[regions.all$start_idx == 112] <- "NKX2-1";
+regions.all$gene[regions.all$start_idx == 144] <- "CCND1";
+regions.all$gene[regions.all$start_idx == 72] <- "NKX2-1";
 
 qdraw(
 	ggplot(regions.all, aes(x=ldiff, y=fdr, alpha=keep, colour=group, label=gene)) + theme_classic() +

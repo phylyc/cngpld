@@ -57,6 +57,24 @@ median_center_seg <- function(seg) {
 	d
 }
 
+wmean_center_seg <- function(seg) {
+	segs <- split(seg, list(seg$sample, seg$chromosome));
+	d <- do.call(rbind,
+		lapply(segs,
+			function(s) {
+				w <- s$end - s$start + 1;
+				w <- w / sum(w);
+				m <- sum(w * s$logr);
+				s$logr <- s$logr - m;
+				s
+			}
+		)
+	);
+	rownames(d) <- NULL;
+
+	d
+}
+
 #' Convert data.frame of segments to GRanges
 #' 
 #' @import GenomicRanges IRanges GenomeInfoDb
@@ -84,7 +102,7 @@ seg_to_gr <- function(seg, genome=NA) {
 
 # Compute mean copy-number at a genomic position
 # @param gr  GRanges object
-mean_cn_at_position <- function(gr, pos, direction, cutoff) {
+summarize_cn_at_position <- function(gr, pos, direction, cutoff) {
 	# S4Vectors::from is not available in older versions (v0.8.11),
 	# so we avoid using it
 	ov <- findOverlaps(ranges(gr), IRanges(start=pos, end=pos));
@@ -101,22 +119,22 @@ mean_cn_at_position <- function(gr, pos, direction, cutoff) {
 
 #' Summarize copy-number values
 #' 
-#' @param gr        GRanges object
+#' @param gr         GRanges object
 #' @param direction  direction of change: 1 for amp, -1 for del
 #' @param cutoff     absolute threshold for copy-number log ratio
 #' @return  a \code{cn_summary} object
 #' @export
-summarize_cn <- function(gr, direction=1, cutoff=0.1) {
+summarize_cn <- function(gr, direction, cutoff) {
 	positions <- sort(unique(c(start(gr), end(gr))));
-	y <- unlist(lapply(positions,
+	values <- unlist(lapply(positions,
 		function(pos) {
-			mean_cn_at_position(gr, pos, direction=direction, cutoff=cutoff)
+			summarize_cn_at_position(gr, pos, direction=direction, cutoff=cutoff)
 		}
 	));
 	structure(
 		data.frame(
 			position = positions,
-			value = y
+			value = values
 		),
 		class = "cn_summary"
 	)
@@ -125,14 +143,15 @@ summarize_cn <- function(gr, direction=1, cutoff=0.1) {
 #' Collapse repeated runs
 #'
 #' @param  d          \code{cn_summary} object
-#' @param  digits     number of digits to keep after rounding
+#' @param  res        resolution (higher order of magnitude leads to 
+#'                    less coarsening)
 #' @param  max.len    max length that can be collapsed into one data point;
 #'                    all other runs will be collapsed to the two end points
 #' @return \code{cn_summary} object
 #' @export
-collapse_runs <- function(d, digits=2, max.len=2e6) {
+collapse_runs <- function(d, res=100, max.len=2e6) {
 	# get repeated runs
-	r <- rle(round(d$value, digits=digits));
+	r <- rle(round(d$value * res) / res);
 
 	# start and end index of repeated runs
 	starts <- cumsum(c(1, r$lengths[-length(r$lengths)]));
@@ -189,7 +208,7 @@ collapse_runs <- function(d, digits=2, max.len=2e6) {
 #' @param ...      other parameters to \code{gpldiff()}
 #' @return a list of \code{gpldiff} objects
 #' @export
-compare_segs <- function(case, control, params=NULL, hparams=NULL, smooth=TRUE, collapse=TRUE, cutoff=0.1, verbose=1, ...) {
+compare_segs <- function(case, control, params=NULL, hparams=NULL, smooth=TRUE, collapse=TRUE, cutoff=0.5, verbose=1, ...) {
 	
 	if (is.character(case)) {
 		case <- read_seg(case);
@@ -209,7 +228,9 @@ compare_segs <- function(case, control, params=NULL, hparams=NULL, smooth=TRUE, 
 
 	# seg contains only segments from one chromosome
 	summarize_amp_del <- function(seg) {
-		gr <- seg_to_gr(median_center_seg(seg));
+		#gr <- seg_to_gr(median_center_seg(seg));
+		#gr <- seg_to_gr(seg);
+		gr <- seg_to_gr(wmean_center_seg(seg));
 		d.amp <- summarize_cn(gr, direction=1, cutoff=cutoff);
 		d.del <- summarize_cn(gr, direction=-1, cutoff=cutoff);
 		if (smooth) {

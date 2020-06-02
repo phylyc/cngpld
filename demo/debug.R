@@ -11,41 +11,58 @@ seg.lusc <- read_seg("tcga-lusc.seg");
 
 #chrom <- "3";
 chrom <- "14";
+#chrom <- "11";
 
 seg.luad.chr <- seg.luad[seg.luad$chromosome == chrom, ];
 seg.lusc.chr <- seg.lusc[seg.lusc$chromosome == chrom, ];
 
+cutoff <- 0.5;
+
 
 # Run analysis ###############################################################
 
-gr.luad <- seg_to_gr(median_center_seg(seg.luad.chr));
-d.amp.luad <- summarize_cn(gr.luad, direction=1, cutoff=0.1);
-d.del.luad <- summarize_cn(gr.luad, direction=-1, cutoff=0.1);
+#gr.luad <- seg_to_gr(median_center_seg(seg.luad.chr));
+gr.luad <- seg_to_gr(wmean_center_seg(seg.luad.chr));
+#gr.luad <- seg_to_gr(seg.luad.chr);
+
+d.amp.luad <- summarize_cn(gr.luad, direction=1, cutoff=cutoff);
+d.del.luad <- summarize_cn(gr.luad, direction=-1, cutoff=cutoff);
 summary(d.amp.luad$value)
 summary(d.del.luad$value)
 
 gr <- gr.luad;
 
 direction <- 1;
-cutoff <- 0.1;
 
-positions <- sort(unique(c(start(gr), end(gr))));
-vlist <- lapply(positions,
-	function(pos) {
-		ov <- findOverlaps(ranges(gr), IRanges(start=pos, end=pos));
-		idx <- as.matrix(ov)[,1];
-		logr <- direction * gr$logr[idx];
-		ifelse(logr > cutoff, logr, 0)
-	}
-);
-values <- unlist(vlist);
+#positions <- sort(unique(c(start(gr), end(gr))));
+#vlist <- lapply(positions,
+#	function(pos) {
+#		ov <- findOverlaps(ranges(gr), IRanges(start=pos, end=pos));
+#		idx <- as.matrix(ov)[,1];
+#		logr <- direction * gr$logr[idx];
+#		ifelse(logr > cutoff, logr, 0)
+#	}
+#);
+#values <- unlist(vlist);
 #values <- values[values > 0];
 
-library(MASS)
-alpha <- coef(fitdistr(values, "exponential"));
+#library(MASS)
+#alpha <- coef(fitdistr(values[values < 0.1], "exponential"));
 
-hist(values, breaks=100, freq=FALSE)
-curve(dexp(x, rate=alpha), add=TRUE)
+#hist(values, breaks=1000, freq=FALSE, xlim=c(-1, 1))
+#h <- hist(values, breaks=1000, freq=FALSE);
+#curve(dexp(x, rate=alpha), add=TRUE)
+
+#plot(log(h$mids), log(h$density))
+#idx <- h$density > 0 & h$mids > cutoff;
+#f <- lm(log(h$density[idx]) ~ log(h$mids[idx]))
+#abline(a=coef(f)[1], b=coef(f)[2])
+
+#plot(h$mids, log(h$density))
+#abline(a=log(alpha), b=-alpha)
+#abline(h=log(alpha), )
+
+#qqnorm(values, pch='.')
 
 
 s.amp.luad <- d.amp.luad;
@@ -72,12 +89,14 @@ print(str(c.amp.luad))
 print(str(c.del.luad))
 
 
-gr.lusc <- seg_to_gr(median_center_seg(seg.lusc.chr));
+#gr.lusc <- seg_to_gr(median_center_seg(seg.lusc.chr));
+gr.lusc <- seg_to_gr(wmean_center_seg(seg.lusc.chr));
+#gr.lusc <- seg_to_gr(seg.lusc.chr);
 
-d.amp.lusc <- summarize_cn(gr.lusc, cutoff=0.1);
+d.amp.lusc <- summarize_cn(gr.lusc, direction=1, cutoff=cutoff);
 summary(d.amp.lusc$value)
 
-d.del.lusc <- summarize_cn(gr.lusc, direction=-1, cutoff=0.1);
+d.del.lusc <- summarize_cn(gr.lusc, direction=-1, cutoff=cutoff);
 summary(d.del.lusc$value)
 
 s.amp.lusc <- d.amp.lusc

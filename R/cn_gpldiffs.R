@@ -10,6 +10,9 @@
 #'                   \code{NA} suppresses filtering
 #'                   (see \code{data(centromeres)} for supported builds
 #'                   and chromosome format)
+#' @param ...        other parameters passed to underlying functions:
+#'                   \code{gpldiff::find_sig_regions},
+#'                   \code{cngpld::filter_centromere_regions}
 #' @return a \code{list} of \code{data.frame}
 #' @export
 summary.cn_gpldiffs <- function(object, direction=1, genome=NA, ...) {
@@ -29,7 +32,7 @@ summary.cn_gpldiffs <- function(object, direction=1, genome=NA, ...) {
 
 	regions <- mcmapply(
 		function(rset, type) {
-			d <- gpldiff::process_regions(combine_regions(rset), direction=direction, ...);
+			d <- gpldiff::process_regions(combine_regions(rset), direction=direction);
 			if (!is.null(d) && nrow(d) > 0) {
 				data.frame(type = type, d)
 			} else {

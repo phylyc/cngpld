@@ -30,7 +30,7 @@ if (file.exists(fits.fn)) {
 	# on a single-thread of a Core i7 CPU @ 2.93GHz
 
 	#options(mc.cores=1);
-	fits <- compare_segs(seg.luad, seg.lusc);
+	fits <- compare_segs(seg.luad, seg.lusc, genome);
 
 	qwrite(fits, fits.fn);
 }

@@ -54,7 +54,7 @@ print(filter(regions.luad, end - start + 1 > 1e6, abs(ldiff) > 0.15, fdr < 0.05,
 
 qdraw(
 	{
-		with(fits$amp[["14"]],  # NKX2-1 (TFF-1) amplicon
+		with(fits$amp[["14q"]],  # NKX2-1 (TFF-1) amplicon
 			plot(model, data, which=c("response", "latent", "odds"), xlab="position (Mbp)")
 		)
 	},
@@ -68,7 +68,7 @@ print(filter(regions.lusc, end - start + 1 > 1e6, abs(ldiff) > 0.15, fdr < 0.05,
 
 qdraw(
 	{
-		with(fits$amp[["11"]],  # CCND1 amplicon
+		with(fits$amp[["11q"]],  # CCND1 amplicon
 			plot(model, data, which=c("response", "latent", "odds"), xlab="position (Mbp)")
 		)
 	},
@@ -76,14 +76,13 @@ qdraw(
 	file = "cngpld_lusc_ccnd1.pdf"
 )
 
-with(fits$amp[["3"]], plot(model, data))   # chr3q amplicon
-with(fits$amp[["19"]], plot(model, data))  # chr19 amplicon
-with(fits$amp[["5"]], plot(model, data))   # chr5p arm
+with(fits$amp[["3q"]], plot(model, data))   # chr3q amplicon
+with(fits$amp[["7q"]], plot(model, data))   # CDK6 amplicon
+with(fits$amp[["19q"]], plot(model, data))  # chr19q amplicon
 
-with(fits$del[["1"]], plot(model, data))   # LRP1B deletion
-with(fits$del[["3"]], plot(model, data))   # chr3p arm
-with(fits$del[["9"]], plot(model, data))   # CDKN2A/B deletion
-with(fits$del[["8"]], plot(model, data))   # CSMD1 deletion
+#with(fits$del[["1p"]], plot(model, data))   # LRP1B deletion
+with(fits$del[["9p"]], plot(model, data))   # CDKN2A/B deletion
+#with(fits$del[["8p"]], plot(model, data))   # CSMD1 deletion
 
 qwrite(regions.luad, "cngpld_sig-regions_luad.tsv");
 qwrite(regions.lusc, "cngpld_sig-regions_lusc.tsv");

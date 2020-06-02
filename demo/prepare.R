@@ -23,6 +23,18 @@ seg.lusc <- do.call(rbind, lapply(code.lusc,
 	}
 ));
 
+samples.luad <- unique(seg.luad$sample);
+samples.lusc <- unique(seg.lusc$sample);
+
+pheno <- data.frame(
+	sample = c(samples.luad, samples.lusc),
+	cancer_subtype = c(
+		rep("LUAD", length(samples.luad)),
+		rep("LUSC", length(samples.lusc))
+	)
+);
+
 write_seg(seg.luad, "tcga-luad.seg");
 write_seg(seg.lusc, "tcga-lusc.seg");
+write.table(pheno, "pheno.tsv", sep="\t", quote=FALSE, col.names=TRUE, row.names=FALSE);
 

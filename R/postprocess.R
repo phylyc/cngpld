@@ -21,7 +21,7 @@ get_padded_centromere_regions <- function(genome=c("hg19", "hg38"), padding=1) {
 
 	# centromere coordinates are stored in 1-based
 	cens <- centromeres[[genome]];
-	cen_sizes <- cens$end - cens$start;
+	cen_sizes <- cens$end - cens$start + 1;
 
 	data.frame(
 		chromosome = cens$chromosome,

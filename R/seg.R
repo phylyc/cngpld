@@ -230,8 +230,10 @@ collapse_runs <- function(d, res, max.len=2e6) {
 #' data as log ratios. The column names must be:
 #' \code{sample, chromosome, start, end, nprobes, logr}.
 #'
-#' Results will be organized by chromosome arms and this
-#' function will run faster if \code{genome} build is provided.
+#' If \code{genome} build is provided,
+#' results will be organized by chromosome arms,
+#' broad copy-number events will be more effectively removed,
+#' and computational speed will improve.
 #' See \code{data(centromeres)} for supported genomes.
 #' The chromosome nomenclature must match the target genome.
 #'

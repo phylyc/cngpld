@@ -7,15 +7,13 @@
 #'                    1 indicates case vs. control,
 #'                   -1 indicates control vs. case.
 #' @param genome     genome build to use for filtering centromeres;
-#'                   \code{NA} suppresses filtering
-#'                   (see \code{data(centromeres)} for supported builds
-#'                   and chromosome format)
+#'                   \code{NULL} suppresses filtering
 #' @param lodds.cut  initial log posterior odds threshold for
 #'                   \code{gpldiff::find_sig_regions}
 #' @param ...        other parameters passed to underlying functions
 #' @return a \code{list} of \code{data.frame}
 #' @export
-summary.cn_gpldiffs <- function(object, direction=1, genome=NA, lodds.cut=10, ...) {
+summary.cn_gpldiffs <- function(object, direction=1, genome=NULL, lodds.cut=10, ...) {
 	# cn_gpldiffs is organized as a list of lists,
 	# with first level grouping by type (amp vs. del)
 
@@ -47,7 +45,7 @@ summary.cn_gpldiffs <- function(object, direction=1, genome=NA, lodds.cut=10, ..
 
 	rs <- process_cn_regions(rbind(regions$amp, regions$del))
 
-	if (is.na(genome)) {
+	if (is.null(genome)) {
 		rs
 	} else {
 		filter_centromere_regions(rs, genome=genome, ...)

@@ -117,7 +117,7 @@ wmean_center_arm_seg <- function(seg, genome) {
 #' @param seg     \code{data.frame} containing log ratios
 #' @param genome  genome build
 #' @export
-seg_to_gr <- function(seg, genome=NA) {
+seg_to_gr <- function(seg, genome=NULL) {
 	chroms <- as.character(seg$chromosome);
 	#if (!grepl("^chr", chroms[1])) {
 	#	chroms <- paste0("chr", chroms);
@@ -130,7 +130,9 @@ seg_to_gr <- function(seg, genome=NA) {
 		sample = seg$sample,
 		nprobes = seg$nprobes
 	);
-	genome(gr) <- genome;
+	if (!is.null(genome)) {
+		genome(gr) <- genome;
+	}
 
 	gr
 }
@@ -256,7 +258,7 @@ collapse_runs <- function(d, res, max.len=2e6) {
 #' @return a list of \code{gpldiff} objects
 #' @export
 compare_segs <- function(case, control, params=NULL, hparams=NULL,
-	cn.cut=0.5, smooth=TRUE, cn.res=100, genome=NA, verbose=1, ...
+	cn.cut=0.5, smooth=TRUE, cn.res=100, genome=NULL, verbose=1, ...
 ) {
 	
 	if (is.character(case)) {
@@ -271,7 +273,7 @@ compare_segs <- function(case, control, params=NULL, hparams=NULL,
 		hparams <- default_hparams();
 	}
 
-	if (!is.na(genome)) {
+	if (!is.null(genome)) {
 		case <- split_chromosome_arm_seg(case, genome);
 		control <- split_chromosome_arm_seg(control, genome);
 	}
@@ -334,6 +336,7 @@ compare_segs <- function(case, control, params=NULL, hparams=NULL,
 		dsets, msets,
 		SIMPLIFY=FALSE
 	);
+	attr(fits, "genome") <- genome;
 	
 	structure(fits, class="cn_gpldiffs")
 }

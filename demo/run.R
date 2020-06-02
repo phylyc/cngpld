@@ -76,13 +76,11 @@ qdraw(
 	file = "cngpld_lusc_ccnd1.pdf"
 )
 
-with(fits$amp[["3q"]], plot(model, data))   # chr3q amplicon
+with(fits$amp[["3q"]], plot(model, data))   # chr3q amplicon containnig SOX2
 with(fits$amp[["7q"]], plot(model, data))   # CDK6 amplicon
-with(fits$amp[["19q"]], plot(model, data))  # chr19q amplicon
+with(fits$amp[["19q"]], plot(model, data))  # chr19q amplicon containing CCNE1
 
-#with(fits$del[["1p"]], plot(model, data))   # LRP1B deletion
 with(fits$del[["9p"]], plot(model, data))   # CDKN2A/B deletion
-#with(fits$del[["8p"]], plot(model, data))   # CSMD1 deletion
 
 qwrite(regions.luad, "cngpld_sig-regions_luad.tsv");
 qwrite(regions.lusc, "cngpld_sig-regions_lusc.tsv");

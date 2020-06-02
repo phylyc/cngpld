@@ -75,8 +75,8 @@ qdraw(
 	file = "cngpld_lusc_ccnd1.pdf"
 )
 
-with(fits$amp[["3"]], plot(model, data))   # chr3q arm
-with(fits$amp[["19"]], plot(model, data))  # chr19q arm
+with(fits$amp[["3"]], plot(model, data))   # chr3q amplicon
+with(fits$amp[["19"]], plot(model, data))  # chr19 amplicon
 with(fits$amp[["5"]], plot(model, data))   # chr5p arm
 
 with(fits$del[["1"]], plot(model, data))   # LRP1B deletion

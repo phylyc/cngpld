@@ -107,8 +107,8 @@ regions.all$keep[idx] <- 1.0;
 regions.all$group[!idx] <- "NS";
 
 regions.all$gene <- NA;
-regions.all$gene[regions.all$start_idx == 144] <- "CCND1";
-regions.all$gene[regions.all$start_idx == 72] <- "NKX2-1";
+regions.all$gene[regions.all$chromosome == "14q" & regions.all$group == "case"] <- "NKX2-1";
+regions.all$gene[regions.all$chromosome == "11q" & regions.all$group == "control"] <- "CCND1";
 
 qdraw(
 	ggplot(regions.all, aes(x=ldiff, y=fdr, alpha=keep, colour=group, label=gene)) + theme_classic() +

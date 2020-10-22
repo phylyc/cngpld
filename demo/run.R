@@ -49,8 +49,8 @@ idx <- unlist(lapply(fits$del, function(x) is(x$model, "gpldiff")));
 fits$del <- fits$del[idx];
 
 # significant regions in LUAD
-regions.luad <- summary(fits, genome=genome);
-print(filter(regions.luad, end - start + 1 > 1e6, abs(ldiff) > 0.15, fdr < 0.05, n_obs > 10))
+regions.luad <- summary(fits, genome=genome, lodds.cut=3);
+print(filter(regions.luad, end - start + 5 > 1e6, abs(ldiff) > 0.10, fdr < 0.05, n_obs > 10))
 
 qdraw(
 	{
@@ -63,8 +63,8 @@ qdraw(
 )
 
 # significant regions in LUSC
-regions.lusc <- summary(fits, direction=-1, genome=genome);
-print(filter(regions.lusc, end - start + 1 > 1e6, abs(ldiff) > 0.15, fdr < 0.05, n_obs > 10))
+regions.lusc <- summary(fits, direction=-1, genome=genome, lodds.cut=3);
+print(filter(regions.lusc, end - start + 1 > 1e6, abs(ldiff) > 0.10, fdr < 0.05, n_obs > 10))
 
 qdraw(
 	{
@@ -76,11 +76,15 @@ qdraw(
 	file = "cngpld_lusc_ccnd1.pdf"
 )
 
-with(fits$amp[["3q"]], plot(model, data))   # chr3q amplicon containnig SOX2
+with(fits$amp[["3q"]], plot(model, data))   # chr3q amplicon containing SOX2
 with(fits$amp[["7q"]], plot(model, data))   # CDK6 amplicon
-with(fits$amp[["19q"]], plot(model, data))  # chr19q amplicon containing CCNE1
+with(fits$amp[["8p"]], plot(model, data))   # 8p amplicon containing NSD3 and FGFR
+with(fits$amp[["9p"]], plot(model, data))   # unknown target
 
+# observed in both LUSC and LUAD, but enriched in LUSC
+with(fits$amp[["19q"]], plot(model, data))  # chr19q amplicon containing CCNE1
 with(fits$del[["9p"]], plot(model, data))   # CDKN2A/B deletion
+
 
 qwrite(regions.luad, "cngpld_sig-regions_luad.tsv");
 qwrite(regions.lusc, "cngpld_sig-regions_lusc.tsv");
@@ -101,7 +105,7 @@ regions.all <- rbind(
 	data.frame(regions.lusc, group="control")
 );
 regions.all$group <- factor(regions.all$group, levels=c("control", "case", "NS"));
-idx <- with(regions.all, end - start + 1 > 1e6 & abs(ldiff) > 0.15 & fdr < 0.05 & n_obs > 10);
+idx <- with(regions.all, end - start + 1 > 1e6 & abs(ldiff) > 0.10 & fdr < 0.05 & n_obs > 10);
 regions.all$keep <- 0.75;
 regions.all$keep[idx] <- 1.0;
 regions.all$group[!idx] <- "NS";
@@ -109,13 +113,17 @@ regions.all$group[!idx] <- "NS";
 regions.all$gene <- NA;
 regions.all$gene[regions.all$chromosome == "14q" & regions.all$group == "case"] <- "NKX2-1";
 regions.all$gene[regions.all$chromosome == "11q" & regions.all$group == "control"] <- "CCND1";
+regions.all$gene[regions.all$chromosome == "3q" & regions.all$group == "control"] <- "SOX2";
+regions.all$gene[regions.all$chromosome == "8p" & regions.all$group == "control"] <- "NSD3";
+regions.all$gene[regions.all$chromosome == "7q" & regions.all$group == "control"] <- "CDK6";
+regions.all$gene[regions.all$chromosome == "19q" & regions.all$group == "control"] <- "CCNE1";
 
 qdraw(
 	ggplot(regions.all, aes(x=ldiff, y=fdr, alpha=keep, colour=group, label=gene)) + theme_classic() +
 		geom_point(show.legend=FALSE) +
-		geom_text_repel(show.legend=FALSE, nudge_y=0.1, nudge_x=0.095) +
+		geom_text_repel(show.legend=FALSE, nudge_y=0.2, nudge_x=0.04) +
 		geom_vline(xintercept=0) +
-		geom_vline(xintercept=c(0.15, -0.15), linetype=3, colour="grey60") +
+		geom_vline(xintercept=c(0.10, -0.10), linetype=3, colour="grey60") +
 		geom_hline(yintercept=0.05, linetype=3, colour="grey60") +
 		scale_y_continuous(trans=revlog_trans(10), sec.axis = dup_axis(name=NULL)) +
 		scale_colour_manual(values=c("#0073C2FF", "#EFC000FF", "#333333FF")) +

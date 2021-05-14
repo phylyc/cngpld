@@ -12,6 +12,7 @@
 #'                   \code{gpldiff::find_sig_regions}
 #' @param ...        other parameters passed to underlying functions
 #' @return a \code{list} of \code{data.frame}
+#' @method summary cn_gpldiffs
 #' @export
 summary.cn_gpldiffs <- function(object, direction=1, genome=NULL, lodds.cut=10, ...) {
 	# cn_gpldiffs is organized as a list of lists,

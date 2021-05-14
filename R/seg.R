@@ -201,14 +201,20 @@ collapse_runs <- function(d, res, max.len=2e6) {
 
 	ridx <- gsizes <= max.len;
 
-	# repeated runs that can be collapsed into a single data point (mid point)
-	positions <- region_center(d$position[starts[ridx]], d$position[ends[ridx]]);
-	values <- mapply(
-		function(s, e) {
-			mean(d$value[s:e])
-		},
-		starts[ridx], ends[ridx]
-	);
+	if (sum(ridx) > 0) {
+		# repeated runs that can be collapsed into a single data point (mid point)
+		positions <- region_center(d$position[starts[ridx]], d$position[ends[ridx]]);
+		values <- mapply(
+			function(s, e) {
+				mean(d$value[s:e])
+			},
+			starts[ridx], ends[ridx]
+		);
+	} else {
+		# no runs should be collapsed into a single data point
+		positions <- NULL;
+		values <- NULL;
+	}
 
 	# repeated runs that need to collapsed into two data points (end points)
 	large.starts <- starts[!ridx];

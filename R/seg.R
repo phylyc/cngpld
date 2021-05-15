@@ -288,6 +288,27 @@ compare_segs <- function(case, control, params=NULL, hparams=NULL,
 	case.split <- split(case, list(chromosome = case$chromosome));
 	control.split <- split(control, list(chromosome = control$chromosome));
 
+	# look for common chromosomes
+	chroms.common <- intersect(names(case.split), names(control.split));
+	if (length(chroms.common) == 0) {
+		message("case chromosomes: ")
+		cat(case.split, stderr())
+		message("")
+		message("control chromosomes: ")
+		cat(case.split, stderr())
+		message("")
+		stop("Error: case and control samples have no chromosomes in common.");
+	}
+
+	if (!all(union(names(case.split), names(control.split)) %in% chroms.common)) {
+		# some chromosomes are missing in case or control
+		warning("Warning: cases and controls contain different chromosomes.")
+	}
+
+	# use common chromosomes and ensure that they are in same order
+	case.split <- case.split[chroms.common];
+	control.split <- control.split[chroms.common];
+
 	# seg contains only segments from one chromosome
 	summarize_amp_del <- function(seg) {
 		gr <- seg_to_gr(wmean_center_seg(seg), genome);

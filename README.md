@@ -7,23 +7,31 @@ are more frequently disrupted in the case cohort compared to the control.
 
 ### Installation ###
 
-Install the [gpldiff](https://bitbucket.org/djhshih/gpldiff) package.
+1. Install the [gpldiff](https://bitbucket.org/djhshih/gpldiff) package.
 
-Generated the required data for the package by
+2. Install the [GenomicRanges](https://bioconductor.org/packages/release/bioc/html/GenomicRanges.html) package from Bioconductor.
+
+3. Clone this repository by `git clone https://bitbucket.org/djhshih/cngpld`
+
+4. Generated the required data files for the package by
 
 ```
 cd data-raw
 ./build.sh
 ```
 
-Then, this package may be installed using `devtools`.
-The documentation needs to be generated prior to installation.
+You can edit `build.sh` to generate additional coordinates for additional genomes. See `Makefile`.
+
+5. Generate the documentation for required for this package and install the package using `devtools`.
 
 ```
 library(devtools)
 document()
 install()
 ```
+
+Note: Do *not* simply run `devtools::install_bitbucket()` as it will not generated the required data and documentation files.
+
 
 ### Example ###
 

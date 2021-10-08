@@ -177,6 +177,31 @@ summarize_cn <- function(gr, direction, cutoff) {
 	)
 }
 
+count_cn_at_position <- function(gr, pos, direction, cutoff) {
+	ov <- findOverlaps(ranges(gr), IRanges(start=pos, end=pos));
+	idx <- as.matrix(ov)[,1];
+	logr <- direction * gr$logr[idx];
+	idx2 <- logr > cutoff;
+
+	sum(idx2)
+}
+
+count_cn <- function(gr, direction, cutoff) {
+	positions <- sort(unique(c(start(gr), end(gr))));
+	values <- unlist(lapply(positions,
+		function(pos) {
+			count_cn_at_position(gr, pos, direction=direction, cutoff=cutoff)
+		}
+	));
+	structure(
+		data.frame(
+			position = positions,
+			count = values
+		),
+		class = "cn_counts"
+	)
+}
+
 #' Collapse repeated runs
 #'
 #' @param  d          \code{cn_summary} object
@@ -232,6 +257,79 @@ collapse_runs <- function(d, res, max.len=2e6) {
 	dc[order(dc$position), ]
 }
 
+split_segs <- function(case, control, genome=NULL) {
+	if (is.character(case)) {
+		case <- read_seg(case);
+	}
+
+	if (is.character(control)) {
+		control <- read_seg(control);
+	}
+
+	if (!is.null(genome)) {
+		case <- split_chromosome_arm_seg(case, genome);
+		control <- split_chromosome_arm_seg(control, genome);
+	}
+
+	# split by chromosome
+	case.split <- split(case, list(chromosome = case$chromosome));
+	control.split <- split(control, list(chromosome = control$chromosome));
+
+	# look for common chromosomes
+	chroms.common <- intersect(names(case.split), names(control.split));
+	if (length(chroms.common) == 0) {
+		message("case chromosomes: ")
+		cat(case.split, stderr())
+		message("")
+		message("control chromosomes: ")
+		cat(case.split, stderr())
+		message("")
+		stop("Error: case and control samples have no chromosomes in common.");
+	}
+
+	if (!all(union(names(case.split), names(control.split)) %in% chroms.common)) {
+		# some chromosomes are missing in case or control
+		warning("Warning: cases and controls contain different chromosomes.")
+	}
+
+	# use common chromosomes and ensure that they are in same order
+	list(
+		case = case.split[chroms.common],
+		control = control.split[chroms.common]
+	)
+}
+
+count_segs <- function(case, control,
+	cn.cut=0.5, genome=NULL, verbose=1, ...
+) {
+	seg.split <- split_segs(case, control, genome=genome);
+
+	# seg contains only segments from one chromosome
+	count_amp_del <- function(seg) {
+		gr <- seg_to_gr(wmean_center_seg(seg), genome);
+		d.amp <- count_cn(gr, direction=1, cutoff=cn.cut);
+		d.del <- count_cn(gr, direction=-1, cutoff=cn.cut);
+		list(
+			amp = d.amp,
+			del = d.del
+		)
+	}
+
+	s.case <- mclapply(seg.split$case, count_amp_del);
+	s.control <- mclapply(seg.split$control, count_amp_del);
+
+	amp.case <- lapply(s.case, function(x) x$amp);
+	amp.control <- lapply(s.control, function(x) x$amp);
+
+	del.case <- lapply(s.case, function(x) x$del);
+	del.control <- lapply(s.control, function(x) x$del);
+
+	list(
+		amp = list(case = amp.case, control = amp.control),
+		del = list(case = del.case, control = del.control)
+	)
+}
+
 #' Compare copy-number segments using GPLDIFF.
 #'
 #' Assume that input seg file or \code{data.frame} contain copy-number
@@ -266,48 +364,12 @@ collapse_runs <- function(d, res, max.len=2e6) {
 compare_segs <- function(case, control, params=NULL, hparams=NULL,
 	cn.cut=0.5, smooth=TRUE, cn.res=100, genome=NULL, verbose=1, ...
 ) {
-	
-	if (is.character(case)) {
-		case <- read_seg(case);
-	}
-
-	if (is.character(control)) {
-		control <- read_seg(control);
-	}
 
 	if (is.null(hparams)) {
 		hparams <- default_hparams();
 	}
 
-	if (!is.null(genome)) {
-		case <- split_chromosome_arm_seg(case, genome);
-		control <- split_chromosome_arm_seg(control, genome);
-	}
-
-	# split by chromosome
-	case.split <- split(case, list(chromosome = case$chromosome));
-	control.split <- split(control, list(chromosome = control$chromosome));
-
-	# look for common chromosomes
-	chroms.common <- intersect(names(case.split), names(control.split));
-	if (length(chroms.common) == 0) {
-		message("case chromosomes: ")
-		cat(case.split, stderr())
-		message("")
-		message("control chromosomes: ")
-		cat(case.split, stderr())
-		message("")
-		stop("Error: case and control samples have no chromosomes in common.");
-	}
-
-	if (!all(union(names(case.split), names(control.split)) %in% chroms.common)) {
-		# some chromosomes are missing in case or control
-		warning("Warning: cases and controls contain different chromosomes.")
-	}
-
-	# use common chromosomes and ensure that they are in same order
-	case.split <- case.split[chroms.common];
-	control.split <- control.split[chroms.common];
+	seg.split <- split_segs(case, control, genome=genome);
 
 	# seg contains only segments from one chromosome
 	summarize_amp_del <- function(seg) {
@@ -326,8 +388,8 @@ compare_segs <- function(case, control, params=NULL, hparams=NULL,
 		)
 	}
 
-	s.case <- mclapply(case.split, summarize_amp_del);
-	s.control <- mclapply(control.split, summarize_amp_del);
+	s.case <- mclapply(seg.split$case, summarize_amp_del);
+	s.control <- mclapply(seg.split$control, summarize_amp_del);
 
 	amp.case <- lapply(s.case, function(x) x$amp);
 	amp.control <- lapply(s.control, function(x) x$amp);

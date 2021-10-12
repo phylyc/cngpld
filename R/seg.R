@@ -186,7 +186,7 @@ count_cn_at_position <- function(gr, pos, direction, cutoff) {
 	sum(idx2)
 }
 
-count_cn <- function(gr, direction, cutoff, positions=NULL) {
+count_cn <- function(gr, direction, cutoff, positions) {
 	if (is.null(positions)) {
 		positions <- sort(unique(c(start(gr), end(gr))));
 	}
@@ -243,7 +243,7 @@ collapse_runs <- function(d, res, max.len=2e6) {
 		values <- NULL;
 	}
 
-	# repeated runs that need to collapsed into two data points (end points)
+	# repeated runs that need to be collapsed into two data points (end points)
 	large.starts <- starts[!ridx];
 	large.ends <- ends[!ridx];
 	positions.1 <- d$position[large.starts];
@@ -301,7 +301,7 @@ split_segs <- function(case, control, genome=NULL, pair=FALSE) {
 			function(chrom) {
 				list(
 					case = case.split[[chrom]],
-					control = case.split[[chrom]]
+					control = control.split[[chrom]]
 				)
 			}
 		)
@@ -312,6 +312,17 @@ split_segs <- function(case, control, genome=NULL, pair=FALSE) {
 			control = control.split[chroms.common]
 		)
 	}
+}
+
+# collapse runs based on count difference in order to improve speed
+collapse_runs_count <- function(d, res=1, ...) {
+	e <- data.frame(
+		position = d$position,
+		value = d$case - d$control
+	);
+	e <- collapse_runs(e, res=res, max.len=-1);
+
+	d[match(e$position, d$position), ]
 }
 
 count_segs <- function(case, control,
@@ -330,22 +341,34 @@ count_segs <- function(case, control,
 
 		lapply(grs, function(gr) {
 			list(
-				amp = collapse_runs(count_cn(gr, direction=1, cutoff=cn.cut, positions=positions), res=1),
-				del = collapse_runs(count_cn(gr, direction=-1, cutoff=cn.cut, positions=positions), res=1)
+				amp = count_cn(gr, direction=1, cutoff=cn.cut, positions=positions),
+				del = count_cn(gr, direction=-1, cutoff=cn.cut, positions=positions)
 			)
 		})
 	}
 
 	# summary s is organized by chromosomes, group, cna type
 	s <- mclapply(segs.split, count_amp_del);
+
+
 	
-	# organize by cna type, chromosome, group
+	# organize by cna type and chromosome
 	list(
 		amp = lapply(s, function(ss) {
-			list(case = ss$case$amp, control = ss$control$amp)
+			d <- data.frame(
+				position = ss$case$amp$position,
+				case = ss$case$amp$value,
+				control = ss$control$amp$value
+			);
+			collapse_runs_count(d)
 		}),
 		del = lapply(s, function(ss) {
-				list(case = ss$case$del, control = ss$control$del)
+			d <- data.frame(
+				position = ss$case$del$position,
+				case = ss$case$del$value,
+				control = ss$control$del$value
+			);
+			collapse_runs_count(d)
 		})
 	)
 }

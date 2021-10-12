@@ -186,8 +186,10 @@ count_cn_at_position <- function(gr, pos, direction, cutoff) {
 	sum(idx2)
 }
 
-count_cn <- function(gr, direction, cutoff) {
-	positions <- sort(unique(c(start(gr), end(gr))));
+count_cn <- function(gr, direction, cutoff, positions=NULL) {
+	if (is.null(positions)) {
+		positions <- sort(unique(c(start(gr), end(gr))));
+	}
 	values <- unlist(lapply(positions,
 		function(pos) {
 			count_cn_at_position(gr, pos, direction=direction, cutoff=cutoff)
@@ -196,7 +198,7 @@ count_cn <- function(gr, direction, cutoff) {
 	structure(
 		data.frame(
 			position = positions,
-			count = values
+			value = values
 		),
 		class = "cn_counts"
 	)
@@ -257,7 +259,8 @@ collapse_runs <- function(d, res, max.len=2e6) {
 	dc[order(dc$position), ]
 }
 
-split_segs <- function(case, control, genome=NULL) {
+# @param pair  whether to pair case and control seg for each chromosome
+split_segs <- function(case, control, genome=NULL, pair=FALSE) {
 	if (is.character(case)) {
 		case <- read_seg(case);
 	}
@@ -277,6 +280,7 @@ split_segs <- function(case, control, genome=NULL) {
 
 	# look for common chromosomes
 	chroms.common <- intersect(names(case.split), names(control.split));
+	names(chroms.common) <- chroms.common;
 	if (length(chroms.common) == 0) {
 		message("case chromosomes: ")
 		cat(case.split, stderr())
@@ -292,41 +296,57 @@ split_segs <- function(case, control, genome=NULL) {
 		warning("Warning: cases and controls contain different chromosomes.")
 	}
 
-	# use common chromosomes and ensure that they are in same order
-	list(
-		case = case.split[chroms.common],
-		control = control.split[chroms.common]
-	)
+	if (pair) {
+		lapply(chroms.common,
+			function(chrom) {
+				list(
+					case = case.split[[chrom]],
+					control = case.split[[chrom]]
+				)
+			}
+		)
+	} else {
+		# use common chromosomes and ensure that they are in same order
+		list(
+			case = case.split[chroms.common],
+			control = control.split[chroms.common]
+		)
+	}
 }
 
 count_segs <- function(case, control,
 	cn.cut=0.5, genome=NULL, verbose=1, ...
 ) {
-	seg.split <- split_segs(case, control, genome=genome);
+	segs.split <- split_segs(case, control, genome=genome, pair=TRUE);
 
-	# seg contains only segments from one chromosome
-	count_amp_del <- function(seg) {
-		gr <- seg_to_gr(wmean_center_seg(seg), genome);
-		d.amp <- count_cn(gr, direction=1, cutoff=cn.cut);
-		d.del <- count_cn(gr, direction=-1, cutoff=cn.cut);
-		list(
-			amp = d.amp,
-			del = d.del
-		)
+	# segs contain a list of case and control seg data.frames for one chromosome
+	count_amp_del <- function(segs) {
+		grs <- lapply(segs, function(seg) {
+			seg_to_gr(wmean_center_seg(seg), genome)
+		});
+
+		# identify common positions across case and control
+		positions <- sort(unique(c(start(grs$case), start(grs$control), end(grs$case), end(grs$control))));
+
+		lapply(grs, function(gr) {
+			list(
+				amp = collapse_runs(count_cn(gr, direction=1, cutoff=cn.cut, positions=positions), res=1),
+				del = collapse_runs(count_cn(gr, direction=-1, cutoff=cn.cut, positions=positions), res=1)
+			)
+		})
 	}
 
-	s.case <- mclapply(seg.split$case, count_amp_del);
-	s.control <- mclapply(seg.split$control, count_amp_del);
-
-	amp.case <- lapply(s.case, function(x) x$amp);
-	amp.control <- lapply(s.control, function(x) x$amp);
-
-	del.case <- lapply(s.case, function(x) x$del);
-	del.control <- lapply(s.control, function(x) x$del);
-
+	# summary s is organized by chromosomes, group, cna type
+	s <- mclapply(segs.split, count_amp_del);
+	
+	# organize by cna type, chromosome, group
 	list(
-		amp = list(case = amp.case, control = amp.control),
-		del = list(case = del.case, control = del.control)
+		amp = lapply(s, function(ss) {
+			list(case = ss$case$amp, control = ss$control$amp)
+		}),
+		del = lapply(s, function(ss) {
+				list(case = ss$case$del, control = ss$control$del)
+		})
 	)
 }
 

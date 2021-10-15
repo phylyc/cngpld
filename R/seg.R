@@ -395,6 +395,7 @@ count_segs <- function(case, control,
 #' @param param    initial parameter values to \code{gpldiff()}
 #' @param hparams  hyperparameter values to \code{gpldiff()}
 #' @param cn.cut   absolute threshold for copy-number log ratio
+#' @param pair     analyze data in pair mode
 #' @param smooth   whether to median smooth the copy-number data
 #' @param cn.res   copy-number resolution; if value is positive, collapse 
 #'                 runs of repeats (which improves speed) while preserving 
@@ -405,7 +406,7 @@ count_segs <- function(case, control,
 #' @return a list of \code{gpldiff} objects
 #' @export
 compare_segs <- function(case, control, params=NULL, hparams=NULL,
-	cn.cut=0.5, smooth=TRUE, cn.res=100, pair=FALSE, genome=NULL, verbose=1, ...
+	cn.cut=0.5, pair=FALSE, smooth=TRUE, cn.res=100, genome=NULL, verbose=1, ...
 ) {
 
 	if (is.null(hparams)) {

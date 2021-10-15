@@ -161,7 +161,7 @@ summarize_cn_at_position <- function(gr, pos, direction, cutoff) {
 #' @param cutoff     absolute threshold for copy-number log ratio
 #' @return  a \code{cn_summary} object
 #' @export
-summarize_cn <- function(gr, direction, cutoff) {
+summarize_cn <- function(gr, direction, cutoff, positions=NULL) {
 	if (is.null(positions)) {
 		positions <- sort(unique(c(start(gr), end(gr))));
 	}
@@ -188,7 +188,7 @@ count_cn_at_position <- function(gr, pos, direction, cutoff) {
 	sum(idx2)
 }
 
-count_cn <- function(gr, direction, cutoff, positions) {
+count_cn <- function(gr, direction, cutoff, positions=NULL) {
 	if (is.null(positions)) {
 		positions <- sort(unique(c(start(gr), end(gr))));
 	}
@@ -351,8 +351,6 @@ count_segs <- function(case, control,
 
 	# summary s is organized by chromosomes, group, cna type
 	s <- mclapply(segs.split, count_amp_del);
-
-
 	
 	# organize by cna type and chromosome
 	list(
@@ -370,7 +368,7 @@ count_segs <- function(case, control,
 				case = ss$case$del$value,
 				control = ss$control$del$value
 			);
-			collapse_runs_count(d)
+			collapse_runs_paired(d)
 		})
 	)
 }
@@ -407,45 +405,123 @@ count_segs <- function(case, control,
 #' @return a list of \code{gpldiff} objects
 #' @export
 compare_segs <- function(case, control, params=NULL, hparams=NULL,
-	cn.cut=0.5, smooth=TRUE, cn.res=100, genome=NULL, verbose=1, ...
+	cn.cut=0.5, smooth=TRUE, cn.res=100, pair=FALSE, genome=NULL, verbose=1, ...
 ) {
 
 	if (is.null(hparams)) {
 		hparams <- default_hparams();
 	}
 
-	seg.split <- split_segs(case, control, genome=genome);
+	if (pair) {
+		
+		segs.split <- split_segs(case, control, genome=genome, pair=TRUE);
 
-	# seg contains only segments from one chromosome
-	summarize_amp_del <- function(seg) {
-		gr <- seg_to_gr(wmean_center_seg(seg), genome);
-		d.amp <- summarize_cn(gr, direction=1, cutoff=cn.cut);
-		d.del <- summarize_cn(gr, direction=-1, cutoff=cn.cut);
-		if (smooth) {
-			d.amp$value <- as.numeric(smooth(d.amp$value));
-			d.del$value <- as.numeric(smooth(d.del$value));
+		# segs contain a list of case and control seg data.frames for one chromosome
+		summarize_amp_del <- function(segs) {
+			grs <- lapply(segs, function(seg) {
+				seg_to_gr(wmean_center_seg(seg), genome)
+			});
+
+			# identify common positions across case and control
+			positions <- sort(unique(c(start(grs$case), start(grs$control), end(grs$case), end(grs$control))));
+
+			lapply(grs, function(gr) {
+				d.amp <- summarize_cn(gr, direction=1, cutoff=cn.cut, positions=positions);
+				d.del <- summarize_cn(gr, direction=-1, cutoff=cn.cut, positions=positions);
+				if (smooth) {
+					d.amp$value <- as.numeric(smooth(d.amp$value));
+					d.del$value <- as.numeric(smooth(d.del$value));
+				}
+				list(
+					amp = d.amp,
+					del = d.del
+				)
+			})
 		}
-		d.amp <- collapse_runs(d.amp, cn.res);
-		d.del <- collapse_runs(d.del, cn.res);
-		list(
-			amp = d.amp,
-			del = d.del
-		)
+
+		# summary s is organized by chromosomes, group, cna type
+		s <- mclapply(segs.split, summarize_amp_del);
+
+		# organize by cna type and chromosome and collapse runs
+		s.paired <- list(
+			amp = lapply(s, function(ss) {
+				d <- data.frame(
+					position = ss$case$amp$position,
+					case = ss$case$amp$value,
+					control = ss$control$amp$value
+				);
+				collapse_runs_paired(d, res=cn.res)
+			}),
+			del = lapply(s, function(ss) {
+				d <- data.frame(
+					position = ss$case$del$position,
+					case = ss$case$del$value,
+					control = ss$control$del$value
+				);
+				collapse_runs_paired(d, res=cn.res)
+			})
+		);
+
+		# organized by type, then by chromosome
+		s.case <- lapply(s.paired, function(ss) {
+			lapply(ss, function(d) {
+				data.frame(
+					position = d$position,
+					value = d$case
+				)
+			})
+		});
+		s.control <- lapply(s.paired, function(ss) {
+			lapply(ss, function(d) {
+				data.frame(
+					position = d$position,
+					value = d$control
+				)
+			})
+		});
+
+		dsets <- list(
+			amp = mcmapply(prepare_cn, s.case$amp, s.control$amp, SIMPLIFY=FALSE),
+			del = mcmapply(prepare_cn, s.case$del, s.control$del, SIMPLIFY=FALSE)
+		);
+
+	} else {
+
+		seg.split <- split_segs(case, control, genome=genome);
+
+		# seg contains only segments from one chromosome
+		summarize_amp_del <- function(seg) {
+			gr <- seg_to_gr(wmean_center_seg(seg), genome);
+			d.amp <- summarize_cn(gr, direction=1, cutoff=cn.cut);
+			d.del <- summarize_cn(gr, direction=-1, cutoff=cn.cut);
+			if (smooth) {
+				d.amp$value <- as.numeric(smooth(d.amp$value));
+				d.del$value <- as.numeric(smooth(d.del$value));
+			}
+			d.amp <- collapse_runs(d.amp, res=cn.res);
+			d.del <- collapse_runs(d.del, res=cn.res);
+			list(
+				amp = d.amp,
+				del = d.del
+			)
+		}
+
+		# organized by chromosome, then by type
+		s.case <- mclapply(seg.split$case, summarize_amp_del);
+		s.control <- mclapply(seg.split$control, summarize_amp_del);
+
+		amp.case <- lapply(s.case, function(x) x$amp);
+		amp.control <- lapply(s.control, function(x) x$amp);
+
+		del.case <- lapply(s.case, function(x) x$del);
+		del.control <- lapply(s.control, function(x) x$del);
+
+		dsets <- list(
+			amp = mcmapply(prepare_cn, amp.case, amp.control, SIMPLIFY=FALSE),
+			del = mcmapply(prepare_cn, del.case, del.control, SIMPLIFY=FALSE)
+		);
+	
 	}
-
-	s.case <- mclapply(seg.split$case, summarize_amp_del);
-	s.control <- mclapply(seg.split$control, summarize_amp_del);
-
-	amp.case <- lapply(s.case, function(x) x$amp);
-	amp.control <- lapply(s.control, function(x) x$amp);
-
-	del.case <- lapply(s.case, function(x) x$del);
-	del.control <- lapply(s.control, function(x) x$del);
-
-	dsets <- list(
-		amp = mcmapply(prepare_cn, amp.case, amp.control, SIMPLIFY=FALSE),
-		del = mcmapply(prepare_cn, del.case, del.control, SIMPLIFY=FALSE)
-	);
 
 	# fit models for amp and del separately, and for each chromosome
 	msets <- mapply(

@@ -162,7 +162,9 @@ summarize_cn_at_position <- function(gr, pos, direction, cutoff) {
 #' @return  a \code{cn_summary} object
 #' @export
 summarize_cn <- function(gr, direction, cutoff) {
-	positions <- sort(unique(c(start(gr), end(gr))));
+	if (is.null(positions)) {
+		positions <- sort(unique(c(start(gr), end(gr))));
+	}
 	values <- unlist(lapply(positions,
 		function(pos) {
 			summarize_cn_at_position(gr, pos, direction=direction, cutoff=cutoff)
@@ -315,7 +317,7 @@ split_segs <- function(case, control, genome=NULL, pair=FALSE) {
 }
 
 # collapse runs based on count difference in order to improve speed
-collapse_runs_count <- function(d, res=1, ...) {
+collapse_runs_paired <- function(d, res=1, ...) {
 	e <- data.frame(
 		position = d$position,
 		value = d$case - d$control
@@ -360,7 +362,7 @@ count_segs <- function(case, control,
 				case = ss$case$amp$value,
 				control = ss$control$amp$value
 			);
-			collapse_runs_count(d)
+			collapse_runs_paired(d)
 		}),
 		del = lapply(s, function(ss) {
 			d <- data.frame(

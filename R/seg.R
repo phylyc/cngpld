@@ -179,6 +179,7 @@ summarize_cn <- function(gr, direction, cutoff, positions=NULL) {
 	)
 }
 
+# Count copy-number alterations at a genomic position
 count_cn_at_position <- function(gr, pos, direction, cutoff) {
 	ov <- findOverlaps(ranges(gr), IRanges(start=pos, end=pos));
 	idx <- as.matrix(ov)[,1];
@@ -188,6 +189,7 @@ count_cn_at_position <- function(gr, pos, direction, cutoff) {
 	sum(idx2)
 }
 
+# Count copy-number alterations
 count_cn <- function(gr, direction, cutoff, positions=NULL) {
 	if (is.null(positions)) {
 		positions <- sort(unique(c(start(gr), end(gr))));
@@ -327,6 +329,7 @@ collapse_runs_paired <- function(d, res=1, ...) {
 	d[match(e$position, d$position), ]
 }
 
+# Count copy-number alterations at breakpoints in seg data.frame objects
 count_segs <- function(case, control,
 	cn.cut=0.5, genome=NULL, verbose=1, ...
 ) {

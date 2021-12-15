@@ -13,7 +13,7 @@ are more frequently disrupted in the case cohort compared to the control.
 
 3. Clone this repository by `git clone https://bitbucket.org/djhshih/cngpld`
 
-4. Generated the required data files for the package by
+4. Navigate to the directory of the repository in your shell environment. Generate the required data files for the package by
 
 ```
 cd data-raw
@@ -22,7 +22,7 @@ cd data-raw
 
 You can edit `build.sh` to generate additional coordinates for additional genomes. See `Makefile`.
 
-5. Generate the documentation for required for this package and install the package using `devtools`.
+5. Navigate to the directory of the repository in your R environment. Generate the documentation for required for this package and install the package using `devtools`.
 
 ```
 library(devtools)

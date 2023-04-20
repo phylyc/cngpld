@@ -297,7 +297,12 @@ split_segs <- function(case, control, genome=NULL, pair=FALSE) {
 
 	if (!all(union(names(case.split), names(control.split)) %in% chroms.common)) {
 		# some chromosomes are missing in case or control
-		warning("Warning: cases and controls contain different chromosomes.")
+		missing.in.case <- setdiff(names(control.split), names(case.split));
+		missing.in.control <- setdiff(names(case.split), names(control.split));
+		warning("Warning: cases and controls contain different chromosomes.\n",
+			"Missing in case: ", paste(missing.in.case, collapse=", "), "\n",
+			"Missing in control: ", paste(missing.in.control, collapse=", ")
+		);
 	}
 
 	if (pair) {

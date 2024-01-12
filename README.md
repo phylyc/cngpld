@@ -7,6 +7,8 @@ are more frequently disrupted in the case cohort compared to the control.
 
 ### Installation ###
 
+1. Install the `argparser` package from CRAN.
+
 1. Install the [gpldiff](https://bitbucket.org/djhshih/gpldiff) package.
 
 2. Install the [GenomicRanges](https://bioconductor.org/packages/release/bioc/html/GenomicRanges.html) package from Bioconductor.

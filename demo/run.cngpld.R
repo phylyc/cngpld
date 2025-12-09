@@ -16,15 +16,11 @@ suppressPackageStartupMessages({
 args <- commandArgs(trailingOnly = TRUE)
 outdir <- "."
 study <- "CASE_vs_CONTROL"
-case_label <- "CASE"
-control_label <- "CONTROL"
 use_cache <- TRUE
 if (length(args) > 0) {
   for (arg in args) {
     if (grepl("^--dir=", arg)) { outdir <- sub("^--dir=", "", arg) }
     if (grepl("^--study=", arg)) { study <- sub("^--study=", "", arg) }
-    if (grepl("^--case_label=", arg)) { case_label <- sub("^--case_label=", "", arg) }
-    if (grepl("^--control_label=", arg)) { control_label <- sub("^--control_label=", "", arg) }
     if (grepl("^--no-cache", arg)) { use_cache <- FALSE }
   }
 }

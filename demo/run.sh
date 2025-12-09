@@ -1,10 +1,10 @@
 #!/bin/bash
 
-Rscript run.cngpld.R \
+Rscript ../scripts/run.cngpld.R \
   --dir="." \
   --study="luad_vs_lusc"
 
-Rscript plot.cngpld.R \
+Rscript ../scripts/plot.cngpld.R \
   --dir="." \
   --study="luad_vs_lusc" \
   --case_label="Lung Adenocarcinoma" \

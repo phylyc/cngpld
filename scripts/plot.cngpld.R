@@ -289,8 +289,7 @@ plot_vulcano_combined <- function(amp_regions, del_regions, suffix = "both") {
         y     = c(ymin, ymin),
         label = c(control_label, case_label),
         hjust = c(1, 0),
-        vjust = -1.3,
-        fontface = "bold",
+        vjust = -1,
         size  = 5
       )
     } else {
@@ -422,7 +421,7 @@ plot_vulcano_combined <- function(amp_regions, del_regions, suffix = "both") {
         min.segment.length = 0,
         force = 4,
         max.time = 1,
-        aes(x = fc, y = fdr, label = gene, size = 3.5 * score, colour = I(mixed_text_col))
+        aes(x = fc, y = fdr, label = gene, size = 3.3 * score, colour = I(mixed_text_col))
       ) +
       scale_size_identity(guide = "none") +
 

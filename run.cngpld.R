@@ -9,70 +9,97 @@ suppressPackageStartupMessages({
   library(devtools)
   library(parallel)
   library(purrr)
+  library(GenomicRanges)
   library(cngpld)
   library(rjson)
+  library(optparse)
 })
 
-args <- commandArgs(trailingOnly = TRUE)
-outdir <- "."
-study <- "CASE_vs_CONTROL"
-use_cache <- TRUE
-if (length(args) > 0) {
-  for (arg in args) {
-    if (grepl("^--dir=", arg)) { outdir <- sub("^--dir=", "", arg) }
-    if (grepl("^--study=", arg)) { study <- sub("^--study=", "", arg) }
-    if (grepl("^--no-cache", arg)) { use_cache <- FALSE }
-  }
+# Parse command line arguments #################################################
+option_list = list(
+	## REQUIRED
+	make_option(c("--case_file"), type="character", default=NULL, help="Path to the case segmentation file (REQUIRED).", metavar="FILE"),
+	make_option(c("--control_file"), type="character", default=NULL, help="Path to the control segmentation file (REQUIRED).", metavar="FILE"),
+	make_option(c("--outdir"), type="character", default=NULL, help="Output directory for all results and cache (REQUIRED).", metavar="DIR"),
+
+	## OPTIONAL
+	make_option(c("--genome"), type="character", default="hg19", help="Reference genome version (default: %default).", metavar="STRING"),
+	# Caching (Action is important here for a boolean flag)
+	make_option(c("--use-cache"), action="store_true", default=FALSE, help="Flag to enable caching of the model (default: disabled)."),
+	# Statistical & CNV Thresholds
+	make_option(c("--lodds_cut"), type="numeric", default=3, help="Probability of discovery cut-off (default: %default).", metavar="NUM"),
+	make_option(c("--min_tCR"), type="numeric", default=0.4, help="Absolute copy-ratio threshold for CNV summary stats (default: %default).", metavar="NUM"),
+	make_option(c("--min_nprobes"), type="integer", default=4,  help="Minimum number of probes supporting a segment (default: %default).", metavar="INT"),
+	# Annotation and Score Thresholds
+	make_option(c("--fdr_threshold"), type="numeric", default=0.1,  help="FDR threshold for annotation scoring (default: %default).", metavar="NUM"),
+	make_option(c("--fc_threshold"), type="numeric", default=1.1,  help="Fold-change threshold for annotation scoring (default: %default).", metavar="NUM"),
+	make_option(c("--frac_patients_threshold"), type="numeric", default=0.01,  help="Minimum fraction of patients required to retain an interval (default: %default).", metavar="NUM"),
+	make_option(c("--score_threshold"), type="numeric", default=0.5, help="Annotation confidence threshold (default: %default).", metavar="NUM"),
+	make_option(c("--min_seg_size"), type="integer", default=1e5, help="Minimum segment size (base pairs) for significance (default: %default).", metavar="INT"),
+	make_option(c("--n_obs_threshold"), type="integer", default=5, help="Minimum number of observations (samples) required for significance (default: %default).", metavar="INT")
+)
+parser <- OptionParser(option_list=option_list)
+opt <- parse_args(parser)
+
+# Explicitly check for required arguments (those defined with default=NULL)
+required_args <- c("case_file", "control_file", "outdir")
+missing_args <- required_args[sapply(opt[required_args], is.null)]
+if (length(missing_args) > 0) {
+  stop(paste("Missing arguments:", paste(paste0("--", missing_args), collapse=", ")))
 }
-message("Output directory:", outdir)
 
-dir.create(paste0(outdir, "/cngpld"), showWarnings = FALSE, recursive = TRUE)
+print(opt) # Print all parsed options for monitoring
+case_file <- opt$case_file
+control_file <- opt$control_file
+outdir <- opt$outdir
+genome <- opt$genome
+use_cache <- opt$`use-cache` # Use backticks if you keep the hyphen in the variable name
+lodds_cut <- opt$lodds_cut
+min_tCR <- opt$min_tCR
+min_nprobes <- opt$min_nprobes
+fdr_threshold <- opt$fdr_threshold
+fc_threshold <- opt$fc_threshold
+frac_patients_threshold <- opt$frac_patients_threshold
+score_threshold <- opt$score_threshold
+min_seg_size <- opt$min_seg_size
+n_obs_threshold <- opt$n_obs_threshold
 
+dir.create(paste0(outdir), showWarnings = FALSE, recursive = TRUE)
 
-# Configurations ##############################################################
+# Function to extract file label from path
+get_file_label <- function(filepath) {
+	if (is.na(filepath)) {
+		return(NA_character_)
+	}
+	base_name <- basename(filepath)
+	# Removes everything from the first dot to the end
+	label <- sub("\\..*$", "", base_name)
+	return(label)
+}
 
-case <- unlist(strsplit(study, "_vs_"))[1]
-control <- unlist(strsplit(study, "_vs_"))[2]
-
-genome <- "hg19"
-fits.fn <- paste0(outdir, "/cngpld/", case, "-vs-", control, ".rds")
-
-# lodds.cut - probability of discovery
-# 3 <-> 0.953
-# 4 <-> 0.982
-# 5 <-> 0.993
-lodds.cut <- 3
-min_tCR <- 0.3  # absolute threshold for copy-number log ratio to be considered in summary statistics
-min_nprobes <- 4  # minimum number of targets supporting a segment
-
-# For interval annotations:
-fdr_threshold <- 0.1  # defines where score == 0.9 for fc >> 1
-fc_threshold <- 1.15  # defines where score == 0.9 for fdr << 0
-frac_patients_threshold <- 0.01
-score_threshold <- 0.5  # annotation threshold
-min_seg_size <- 1e5
-n_obs_threshold <- 5
-
+case <- get_file_label(case_file)
+control <- get_file_label(control_file)
 
 # Run analysis ################################################################
-
 seg.case <- cngpld::read_seg(
-  paste0(outdir, "/tcga-", case, ".seg.gz")
+  case_file
 ) %>% mutate( logr = pmax(log(2) * logr, -3) ) %>% filter( nprobes >= min_nprobes )
+
 seg.control <- cngpld::read_seg(
-  paste0(outdir, "/tcga-", control, ".seg.gz")
+  control_file
 ) %>% mutate( logr = pmax(log(2) * logr, -3) ) %>% filter( nprobes >= min_nprobes )
 
+fits.fn <- paste0(outdir, "/", case, "-vs-", control, ".rds")
 if (file.exists(fits.fn) & use_cache) {
-
   # cat("Using cached model.")
   fits <- io::qread(fits.fn)
 
 } else {
 
-  options(mc.cores = 8)
+  options(mc.cores = 1)
   fits <- cngpld::compare_segs(
-    seg.case, seg.control,
+    seg.case,
+    seg.control,
     genome = genome,
     cn.cut = min_tCR,  # absolute threshold for copy-number log ratio to be considered in summary statistics
     smooth = TRUE,  # whether to median smooth the copy-number data
@@ -92,18 +119,18 @@ fits.orig <- fits
 idx <- unlist(lapply(fits$del, function(x) is(x$model, "gpldiff")))
 fits$del <- fits$del[idx]
 
-regions.case <- summary(fits, genome = genome, lodds.cut = lodds.cut)
-regions.control <- summary(fits, direction = -1, genome = genome, lodds.cut = lodds.cut)
+regions.case <- summary(fits, genome = genome, lodds.cut = lodds_cut)
+regions.control <- summary(fits, direction = -1, genome = genome, lodds.cut = lodds_cut)
 if (is.null(regions.control)) {
   regions.control <- regions.case[FALSE,]
 }
 
+# Create plots for each chr arm
 plot_region <- function(chr_arm, profile, profile_str = "amp") {
   qdraw({
     with(profile[[chr_arm]], plot(model, data, which = c("response", "latent", "odds"), xlab = "position (Mbp)"))
-  }, width = 5, height = 10, file = paste0(outdir, "/cngpld/chr/chr", chr_arm, "_", profile_str, ".pdf"))
+  }, width = 5, height = 10, file = paste0(outdir, "/", chr_arm, "_", profile_str, ".pdf"))
 }
-
 for (arm in (filter(regions.case, type == "Amp")$chromosome)) {
   plot_region(chr_arm = arm, profile = fits$amp, profile_str = "amp")
 }
@@ -170,19 +197,17 @@ annotate_frac_patients <- function(regions, seg, min_tCR) {
     regions[del_counts, frac_patients := n_samples_hit / n_samples, on = "region_id"]
   }
 
-  regions[, region_id := NULL]               # drop temp ID
+  regions[, region_id := NULL] # drop temp ID
   regions[]
 }
 
-regions.case    <- annotate_frac_patients(regions.case,    seg.case,    min_tCR)
+regions.case <- annotate_frac_patients(regions.case, seg.case, min_tCR)
 regions.control <- annotate_frac_patients(regions.control, seg.control, min_tCR)
 
 
-# The "score" is a measure of confidence in this interval as a characteristic of
-# the difference between those two cohorts. It scales with 1 - fdr and with
-# 1 - fc^k for fc < 1 and some power k. This score could be used e.g. for downstream
-# pathway or over-representation analysis.
-
+# The "score" is a measure of confidence in this interval as a characteristic of the difference between those two cohorts.
+    # Scales with 1 - fdr and with 1 - fc^k for fc < 1 and some power k. 
+    # This score could be used e.g. for downstream pathway or over-representation analysis.
 beta = -log(fdr_threshold)
 x_abslog <- function(f, t = exp(1)) { return(abs(log(f) / log(t)) )}
 sig <- function(x) { return( 1 - exp(-beta * x) ) }  # = 1 - exp(beta * log(f) / log(t)) = 1 - f ^ (beta / log(t))
@@ -214,5 +239,7 @@ idx <- with(
 )
 regions.control$is_significant[!idx] = "NS"
 
-io::qwrite(regions.case, paste0(outdir, "/cngpld/cngpld_sig-regions_", case, ".tsv"))
-io::qwrite(regions.control, paste0(outdir, "/cngpld/cngpld_sig-regions_", control, ".tsv"))
+io::qwrite(regions.case, file.path(outdir, paste0("cngpld_sig-regions_", case, ".tsv")))
+io::qwrite(regions.control, file.path(outdir, paste0("cngpld_sig-regions_", control, ".tsv")))
+
+cat(paste0("Saved outputs to: ", outdir, "\n"))

@@ -1,0 +1,10 @@
+
+# From install()
+man
+data-raw/hg19/centromeres.tsv
+data-raw/hg19/cytoBand.txt
+data-raw/hg38/centromeres.tsv
+data-raw/hg38/cytoBand.txt
+
+# sys file
+R/sysdata.rda

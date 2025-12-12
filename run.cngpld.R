@@ -23,20 +23,23 @@ option_list = list(
 	make_option(c("--outdir"), type="character", default=NULL, help="Output directory for all results and cache (REQUIRED).", metavar="DIR"),
 
 	## OPTIONAL
+  make_option(c("--case"), type="character", default="case", help="Label for the case cohort (default: %default).", metavar="STRING"),
+  make_option(c("--control"), type="character", default="control", help="Label for the control cohort (default: %default).", metavar="STRING"),
 	make_option(c("--genome"), type="character", default="hg19", help="Reference genome version (default: %default).", metavar="STRING"),
 	# Caching (Action is important here for a boolean flag)
-	make_option(c("--use-cache"), action="store_true", default=FALSE, help="Flag to enable caching of the model (default: disabled)."),
+	make_option(c("--use-cache"), action="store_true", default=FALSE, help="Flag to enable caching of the model (default: FALSE)."),
 	# Statistical & CNV Thresholds
 	make_option(c("--lodds_cut"), type="numeric", default=3, help="Probability of discovery cut-off (default: %default).", metavar="NUM"),
-	make_option(c("--min_tCR"), type="numeric", default=0.4, help="Absolute copy-ratio threshold for CNV summary stats (default: %default).", metavar="NUM"),
+	make_option(c("--min_tCR"), type="numeric", default=0.3, help="Absolute copy-ratio threshold for CNV summary stats (default: %default).", metavar="NUM"),
 	make_option(c("--min_nprobes"), type="integer", default=4,  help="Minimum number of probes supporting a segment (default: %default).", metavar="INT"),
 	# Annotation and Score Thresholds
 	make_option(c("--fdr_threshold"), type="numeric", default=0.1,  help="FDR threshold for annotation scoring (default: %default).", metavar="NUM"),
-	make_option(c("--fc_threshold"), type="numeric", default=1.1,  help="Fold-change threshold for annotation scoring (default: %default).", metavar="NUM"),
-	make_option(c("--frac_patients_threshold"), type="numeric", default=0.01,  help="Minimum fraction of patients required to retain an interval (default: %default).", metavar="NUM"),
+	make_option(c("--fc_threshold"), type="numeric", default=1.15,  help="Fold-change threshold for annotation scoring (default: %default).", metavar="NUM"),
+	make_option(c("--frac_patients_threshold"), type="numeric", default=0.01, help="Minimum fraction of patients required to retain an interval (default: %default).", metavar="NUM"),
 	make_option(c("--score_threshold"), type="numeric", default=0.5, help="Annotation confidence threshold (default: %default).", metavar="NUM"),
-	make_option(c("--min_seg_size"), type="integer", default=1e5, help="Minimum segment size (base pairs) for significance (default: %default).", metavar="INT"),
-	make_option(c("--n_obs_threshold"), type="integer", default=5, help="Minimum number of observations (samples) required for significance (default: %default).", metavar="INT")
+	make_option(c("--min_seg_size"), type="integer", default=5e4, help="Minimum segment size (base pairs) for significance (default: %default).", metavar="INT"),
+	make_option(c("--n_obs_threshold"), type="integer", default=5, help="Minimum number of observations (samples) required for significance (default: %default).", metavar="INT"),
+  make_option(c("--n_cores"), type="integer", default=1, help="Number of CPU cores to use (default: %default).", metavar="INT")
 )
 parser <- OptionParser(option_list=option_list)
 opt <- parse_args(parser)
@@ -50,7 +53,9 @@ if (length(missing_args) > 0) {
 
 print(opt) # Print all parsed options for monitoring
 case_file <- opt$case_file
+case <- opt$case
 control_file <- opt$control_file
+control <- opt$control
 outdir <- opt$outdir
 genome <- opt$genome
 use_cache <- opt$`use-cache` # Use backticks if you keep the hyphen in the variable name
@@ -63,22 +68,23 @@ frac_patients_threshold <- opt$frac_patients_threshold
 score_threshold <- opt$score_threshold
 min_seg_size <- opt$min_seg_size
 n_obs_threshold <- opt$n_obs_threshold
+n_cores <- opt$n_cores
 
 dir.create(paste0(outdir), showWarnings = FALSE, recursive = TRUE)
 
-# Function to extract file label from path
-get_file_label <- function(filepath) {
-	if (is.na(filepath)) {
-		return(NA_character_)
-	}
-	base_name <- basename(filepath)
-	# Removes everything from the first dot to the end
-	label <- sub("\\..*$", "", base_name)
-	return(label)
-}
+# # Function to extract file label from path
+# get_file_label <- function(filepath) {
+# 	if (is.na(filepath)) {
+# 		return(NA_character_)
+# 	}
+# 	base_name <- basename(filepath)
+# 	# Removes everything from the first dot to the end
+# 	label <- sub("\\..*$", "", base_name)
+# 	return(label)
+# }
 
-case <- get_file_label(case_file)
-control <- get_file_label(control_file)
+# case <- get_file_label(case_file)
+# control <- get_file_label(control_file)
 
 # Run analysis ################################################################
 seg.case <- cngpld::read_seg(
@@ -96,7 +102,7 @@ if (file.exists(fits.fn) & use_cache) {
 
 } else {
 
-  options(mc.cores = 1)
+  options(mc.cores = n_cores)
   fits <- cngpld::compare_segs(
     seg.case,
     seg.control,

@@ -40,13 +40,15 @@ option_list = list(
 	make_option(c("--outdir"), type="character", default=NULL, help="Output directory for all results and cache (REQUIRED).", metavar="DIR"),
 
 	## OPTIONAL
+  make_option(c("--case"), type="character", default="case", help="Label for the case cohort (default: %default).", metavar="STRING"),
+  make_option(c("--control"), type="character", default="control", help="Label for the control cohort (default: %default).", metavar="STRING"),
 	make_option(c("--genome"), type="character", default="hg19", help="Reference genome version (default: %default).", metavar="STRING"),
 	# Annotation and Score Thresholds
 	make_option(c("--fdr_threshold"), type="numeric", default=0.1,  help="FDR threshold for annotation scoring (default: %default).", metavar="NUM"),
-	make_option(c("--fc_threshold"), type="numeric", default=1.1,  help="Fold-change threshold for annotation scoring (default: %default).", metavar="NUM"),
+	make_option(c("--fc_threshold"), type="numeric", default=1.15,  help="Fold-change threshold for annotation scoring (default: %default).", metavar="NUM"),
 	make_option(c("--frac_patients_threshold"), type="numeric", default=0.01,  help="Minimum fraction of patients required to retain an interval (default: %default).", metavar="NUM"),
 	make_option(c("--score_threshold"), type="numeric", default=0.5, help="Annotation confidence threshold (default: %default).", metavar="NUM"),
-	make_option(c("--min_seg_size"), type="integer", default=1e5, help="Minimum segment size (base pairs) for significance (default: %default).", metavar="INT"),
+	make_option(c("--min_seg_size"), type="integer", default=5e4, help="Minimum segment size (base pairs) for significance (default: %default).", metavar="INT"),
 	make_option(c("--n_obs_threshold"), type="integer", default=5, help="Minimum number of observations (samples) required for significance (default: %default).", metavar="INT"),
   # Additional files for driver gene annotations
   make_option(c("--drivers_amp_file"), type="character", default=NA, help="Path to drivers.amp.txt file for driver gene annotation (default: %default).", metavar="FILE"),
@@ -66,7 +68,9 @@ if (length(missing_args) > 0) {
 
 print(opt) # Print all parsed options for monitoring
 case_regions <- opt$case_regions
+case <- opt$case
 control_regions <- opt$control_regions
+control <- opt$control
 outdir <- opt$outdir
 genome <- opt$genome
 fdr_threshold <- opt$fdr_threshold
@@ -82,23 +86,23 @@ chr_arms_file <- opt$chr_arms
 
 dir.create(paste0(outdir), showWarnings = FALSE, recursive = TRUE)
 
-# Function to extract file label from path
-get_file_label <- function(filepath) {
-	if (is.na(filepath)) {
-		return(NA_character_)
-	}
-	base_name <- basename(filepath)
-	# Removes everything from the first dot to the end
-	label <- sub("\\..*$", "", base_name)
-	return(label)
-}
+# # Function to extract file label from path
+# get_file_label <- function(filepath) {
+# 	if (is.na(filepath)) {
+# 		return(NA_character_)
+# 	}
+# 	base_name <- basename(filepath)
+# 	# Removes everything from the first dot to the end
+# 	label <- sub("\\..*$", "", base_name)
+# 	return(label)
+# }
 
-case <- get_file_label(case_regions)
-case <- sub("^cngpld_sig-regions_", "", case)
-control <- get_file_label(control_regions)
-control <- sub("^cngpld_sig-regions_", "", control)
-print(case)
-print(control)
+# case <- get_file_label(case_regions)
+# case <- sub("^cngpld_sig-regions_", "", case)
+# control <- get_file_label(control_regions)
+# control <- sub("^cngpld_sig-regions_", "", control)
+# print(case)
+# print(control)
 # fits.fn <- paste0(outdir, "/cngpld/", case, "-vs-", control, ".rds")
 
 # Load Data ###################################################################
@@ -142,7 +146,7 @@ idx <- with(
   regions.all,
   frac_patients >= frac_patients_threshold
   & n_obs >= n_obs_threshold
-  & score >= score_threshold  # data is colored by score
+  # & score >= score_threshold  # data is colored by score
   & end - start + 1 > min_seg_size  # intervals are padded
 )
 

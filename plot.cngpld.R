@@ -135,10 +135,18 @@ invx <- function(y, t = exp(1), base = 10) { return( base^(-x_abslog(f=t, t=base
 
 # evidence / significance / signal score defined in run.cngpld.R
 beta = -log(fdr_threshold)
-sig <- function(x) { return( 1 - exp(-beta * x) ) }  # 1 - exp(beta * log(f) / log(t)) = 1 - f ^ (beta / log(t))
-invsig <- function(y) { return( -log1p(-y) / beta ) }
-def_score <- function(fdr, fc) { return(sig(x_abslog(fdr, t=fdr_threshold)) * sig(x_abslog(fc, t=fc_threshold)) ) }
-fdr_sig_threshold_from_score <- function(score) { return( function(fc) { return( invx(invsig( score / sig(x_abslog(fc, t = fc_threshold)) ), t = fdr_threshold, base = 10) ) } ) }
+sig <- function(x) { 
+  return( 1 - exp(-beta * x) ) 
+}  # 1 - exp(beta * log(f) / log(t)) = 1 - f ^ (beta / log(t))
+invsig <- function(y) { 
+  return( -log1p(-y) / beta ) 
+}
+def_score <- function(fdr, fc) { 
+  return(sig(x_abslog(fdr, t=fdr_threshold)) * sig(x_abslog(fc, t=fc_threshold)) ) 
+}
+fdr_sig_threshold_from_score <- function(score) { 
+  return( function(fc) { return( invx(invsig( score / sig(x_abslog(fc, t = fc_threshold)) ), t = fdr_threshold, base = 10) ) } ) 
+  }
 
 # Already set at the end of cngpld run:
 # regions.all$score <- sig(x_abslog(regions.all$fdr, t=fdr_threshold)) * sig(x_abslog(regions.all$fc, t=fc_threshold))
@@ -400,7 +408,7 @@ plot_vulcano_combined <- function(amp_regions, del_regions, suffix = "both") {
       # MID LINE
       geom_vline(xintercept = 1) +
 
-      # SCORE CONTOUR LINES
+      # # SCORE CONTOUR LINES
       # geom_line(
       #   data = sig_threshold_lines,
       #   aes(x = fc, y = fdr, group = score, alpha = score),

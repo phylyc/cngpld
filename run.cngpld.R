@@ -215,9 +215,15 @@ regions.control <- annotate_frac_patients(regions.control, seg.control, min_tCR)
     # Scales with 1 - fdr and with 1 - fc^k for fc < 1 and some power k. 
     # This score could be used e.g. for downstream pathway or over-representation analysis.
 beta = -log(fdr_threshold)
-x_abslog <- function(f, t = exp(1)) { return(abs(log(f) / log(t)) )}
-sig <- function(x) { return( 1 - exp(-beta * x) ) }  # = 1 - exp(beta * log(f) / log(t)) = 1 - f ^ (beta / log(t))
-def_score <- function(fdr, fc) { return(sig(x_abslog(fdr, t=fdr_threshold)) * sig(x_abslog(fc, t=fc_threshold)) ) }
+x_abslog <- function(f, t = exp(1)) { 
+  return(abs(log(f) / log(t)) )
+}
+sig <- function(x) { 
+  return( 1 - exp(-beta * x) ) 
+}  # = 1 - exp(beta * log(f) / log(t)) = 1 - f ^ (beta / log(t))
+def_score <- function(fdr, fc) { 
+  return(sig(x_abslog(fdr, t=fdr_threshold)) * sig(x_abslog(fc, t=fc_threshold)) ) 
+}
 
 regions.case <- regions.case %>%
   mutate(score = def_score(fdr=fdr, fc=exp(ldiff)), is_significant = "S") %>%

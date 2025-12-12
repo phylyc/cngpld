@@ -45,6 +45,7 @@ option_list = list(
 	make_option(c("--genome"), type="character", default="hg19", help="Reference genome version (default: %default).", metavar="STRING"),
 	# Annotation and Score Thresholds
 	make_option(c("--fdr_threshold"), type="numeric", default=0.1,  help="FDR threshold for annotation scoring (default: %default).", metavar="NUM"),
+  make_option(c("--clip_fdr"), type="numeric", default=0,  help="FDR value of volcano plot to clip (default: %default).", metavar="NUM"),
 	make_option(c("--fc_threshold"), type="numeric", default=1.15,  help="Fold-change threshold for annotation scoring (default: %default).", metavar="NUM"),
 	make_option(c("--frac_patients_threshold"), type="numeric", default=0.01,  help="Minimum fraction of patients required to retain an interval (default: %default).", metavar="NUM"),
 	make_option(c("--score_threshold"), type="numeric", default=0.5, help="Annotation confidence threshold (default: %default).", metavar="NUM"),
@@ -74,6 +75,7 @@ control <- opt$control
 outdir <- opt$outdir
 genome <- opt$genome
 fdr_threshold <- opt$fdr_threshold
+clip_fdr <- opt$clip_fdr
 fc_threshold <- opt$fc_threshold
 frac_patients_threshold <- opt$frac_patients_threshold
 score_threshold <- opt$score_threshold
@@ -111,7 +113,6 @@ regions.control <- io::qread(control_regions)
 regions.case$cohort <- case
 regions.control$cohort <- control
 
-min_fdr <- 1e-3
 regions.all <- rbind(
   data.frame(filter(regions.case, type == "Amp"), group = "Amplification"),
   data.frame(filter(regions.case, type == "Del"), group = "Deletion"),
@@ -120,7 +121,7 @@ regions.all <- rbind(
 ) %>%
   mutate(
     fc = exp(ldiff),
-    fdr = pmax(fdr, min_fdr),
+    fdr = pmax(fdr, clip_fdr),
     chr = paste0(chromosome, arm)
   ) %>%
   arrange(score)  # draw lower score points first.

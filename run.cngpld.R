@@ -23,11 +23,12 @@ option_list = list(
 	make_option(c("--outdir"), type="character", default=NULL, help="Output directory for all results and cache (REQUIRED).", metavar="DIR"),
 
 	## OPTIONAL
-  make_option(c("--case"), type="character", default="case", help="Label for the case cohort (default: %default).", metavar="STRING"),
-  make_option(c("--control"), type="character", default="control", help="Label for the control cohort (default: %default).", metavar="STRING"),
+  make_option(c("--case_tag"), type="character", default="case", help="Tag for the case cohort output file names (default: %default).", metavar="STRING"),
+  make_option(c("--control_tag"), type="character", default="control", help="Tag for the control cohort output file names (default: %default).", metavar="STRING"),
+  make_option(c("--case_label"), type="character", default="case", help="Label for the case cohort (default: %default).", metavar="STRING"),
+  make_option(c("--control_label"), type="character", default="control", help="Label for the control cohort (default: %default).", metavar="STRING"),
 	make_option(c("--genome"), type="character", default="hg19", help="Reference genome version (default: %default).", metavar="STRING"),
-	# Caching (Action is important here for a boolean flag)
-	make_option(c("--use-cache"), action="store_true", default=FALSE, help="Flag to enable caching of the model (default: FALSE)."),
+	make_option(c("--use_cache"), action="store_true", default=FALSE, help="Flag to enable caching of the model (default: FALSE)."),
 	# Statistical & CNV Thresholds
 	make_option(c("--lodds_cut"), type="numeric", default=3, help="Probability of discovery cut-off (default: %default).", metavar="NUM"),
 	make_option(c("--min_tCR"), type="numeric", default=0.3, help="Absolute copy-ratio threshold for CNV summary stats (default: %default).", metavar="NUM"),
@@ -35,7 +36,7 @@ option_list = list(
 	# Annotation and Score Thresholds
 	make_option(c("--fdr_threshold"), type="numeric", default=0.1,  help="FDR threshold for annotation scoring (default: %default).", metavar="NUM"),
 	make_option(c("--fc_threshold"), type="numeric", default=1.15,  help="Fold-change threshold for annotation scoring (default: %default).", metavar="NUM"),
-	make_option(c("--frac_patients_threshold"), type="numeric", default=0.01, help="Minimum fraction of patients required to retain an interval (default: %default).", metavar="NUM"),
+	make_option(c("--frac_patients_threshold"), type="numeric", default=0.1, help="Minimum fraction of patients required to retain an interval (default: %default).", metavar="NUM"),
 	make_option(c("--score_threshold"), type="numeric", default=0.5, help="Annotation confidence threshold (default: %default).", metavar="NUM"),
 	make_option(c("--min_seg_size"), type="integer", default=5e4, help="Minimum segment size (base pairs) for significance (default: %default).", metavar="INT"),
 	make_option(c("--n_obs_threshold"), type="integer", default=5, help="Minimum number of observations (samples) required for significance (default: %default).", metavar="INT"),
@@ -51,14 +52,17 @@ if (length(missing_args) > 0) {
   stop(paste("Missing arguments:", paste(paste0("--", missing_args), collapse=", ")))
 }
 
-print(opt) # Print all parsed options for monitoring
+cat("Input options:\n")
+for (name in names(opt)) {
+  cat(sprintf("  %s: %s\n", name, toString(opt[[name]])))
+}
 case_file <- opt$case_file
-case <- opt$case
+case_tag <- opt$case_tag
 control_file <- opt$control_file
-control <- opt$control
+control_tag <- opt$control_tag
 outdir <- opt$outdir
 genome <- opt$genome
-use_cache <- opt$`use-cache` # Use backticks if you keep the hyphen in the variable name
+use_cache <- opt$use_cache
 lodds_cut <- opt$lodds_cut
 min_tCR <- opt$min_tCR
 min_nprobes <- opt$min_nprobes
@@ -72,20 +76,6 @@ n_cores <- opt$n_cores
 
 dir.create(paste0(outdir), showWarnings = FALSE, recursive = TRUE)
 
-# # Function to extract file label from path
-# get_file_label <- function(filepath) {
-# 	if (is.na(filepath)) {
-# 		return(NA_character_)
-# 	}
-# 	base_name <- basename(filepath)
-# 	# Removes everything from the first dot to the end
-# 	label <- sub("\\..*$", "", base_name)
-# 	return(label)
-# }
-
-# case <- get_file_label(case_file)
-# control <- get_file_label(control_file)
-
 # Run analysis ################################################################
 seg.case <- cngpld::read_seg(
   case_file
@@ -95,9 +85,9 @@ seg.control <- cngpld::read_seg(
   control_file
 ) %>% mutate( logr = pmax(log(2) * logr, -3) ) %>% filter( nprobes >= min_nprobes )
 
-fits.fn <- paste0(outdir, "/", case, "-vs-", control, ".rds")
+fits.fn <- paste0(outdir, "/", case_tag, "-vs-", control_tag, ".rds")
 if (file.exists(fits.fn) & use_cache) {
-  # cat("Using cached model.")
+  cat("Using cached model.")
   fits <- io::qread(fits.fn)
 
 } else {
@@ -132,11 +122,14 @@ if (is.null(regions.control)) {
 }
 
 # Create plots for each chr arm
+dir.create(paste0(outdir, "/chr"), showWarnings = FALSE, recursive = TRUE)
+
 plot_region <- function(chr_arm, profile, profile_str = "amp") {
   qdraw({
     with(profile[[chr_arm]], plot(model, data, which = c("response", "latent", "odds"), xlab = "position (Mbp)"))
-  }, width = 5, height = 10, file = paste0(outdir, "/", chr_arm, "_", profile_str, ".pdf"))
+  }, width = 5, height = 10, file = paste0(outdir, "/chr/", chr_arm, "_", profile_str, ".pdf"))
 }
+
 for (arm in (filter(regions.case, type == "Amp")$chromosome)) {
   plot_region(chr_arm = arm, profile = fits$amp, profile_str = "amp")
 }
@@ -195,7 +188,7 @@ annotate_frac_patients <- function(regions, seg, min_tCR) {
     regions[amp_counts, frac_patients := n_samples_hit / n_samples, on = "region_id"]
   }
 
-  ## Deletions: logr < -min_tCR  (adjust sign if your Seg.CN is coded differently)
+  ## Deletions: logr < -min_tCR
   seg_del <- seg[logr <= -min_tCR]
   if (nrow(seg_del)) {
     hits_del <- foverlaps(seg_del, regions[type == "Del"], nomatch = 0L)
@@ -212,8 +205,8 @@ regions.control <- annotate_frac_patients(regions.control, seg.control, min_tCR)
 
 
 # The "score" is a measure of confidence in this interval as a characteristic of the difference between those two cohorts.
-    # Scales with 1 - fdr and with 1 - fc^k for fc < 1 and some power k. 
-    # This score could be used e.g. for downstream pathway or over-representation analysis.
+# Scales with 1 - fdr and with 1 - fc^k for fc < 1 and some power k.
+# This score could be used e.g. for downstream pathway or over-representation analysis.
 beta = -log(fdr_threshold)
 x_abslog <- function(f, t = exp(1)) { 
   return(abs(log(f) / log(t)) )
@@ -232,9 +225,9 @@ regions.case <- regions.case %>%
 idx <- with(
   regions.case,
   frac_patients >= frac_patients_threshold
+  & n_obs >= n_obs_threshold
   & score >= score_threshold
   & end - start + 1 > min_seg_size
-  & n_obs >= n_obs_threshold
 )
 regions.case$is_significant[!idx] = "NS"
 
@@ -245,13 +238,13 @@ regions.control <- regions.control %>%
 idx <- with(
   regions.control,
   frac_patients >= frac_patients_threshold
+  & n_obs >= n_obs_threshold
   & score >= score_threshold
   & end - start + 1 > min_seg_size
-  & n_obs >= n_obs_threshold
 )
 regions.control$is_significant[!idx] = "NS"
 
-io::qwrite(regions.case, file.path(outdir, paste0("cngpld_sig-regions_", case, ".tsv")))
-io::qwrite(regions.control, file.path(outdir, paste0("cngpld_sig-regions_", control, ".tsv")))
+io::qwrite(regions.case, file.path(outdir, paste0("cngpld_sig-regions.", case_tag, ".tsv")))
+io::qwrite(regions.control, file.path(outdir, paste0("cngpld_sig-regions.", control_tag, ".tsv")))
 
 cat(paste0("Saved outputs to: ", outdir, "\n"))

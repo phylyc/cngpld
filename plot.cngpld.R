@@ -17,6 +17,43 @@ suppressPackageStartupMessages({
   library(optparse)
 })
 
+# Parse command line arguments #################################################
+option_list = list(
+	## REQUIRED
+	make_option(c("--case_regions"), type="character", default=NULL, help="Path to the case cngpld_sig-regions file (REQUIRED).", metavar="FILE"),
+	make_option(c("--control_regions"), type="character", default=NULL, help="Path to the control cngpld_sig-regions file (REQUIRED).", metavar="FILE"),
+	make_option(c("--outdir"), type="character", default=NULL, help="Output directory for all results and cache (REQUIRED).", metavar="DIR"),
+
+	## OPTIONAL
+  make_option(c("--case_tag"), type="character", default="case", help="Tag for the case cohort output file names (default: %default).", metavar="STRING"),
+  make_option(c("--control_tag"), type="character", default="control", help="Tag for the control cohort output file names (default: %default).", metavar="STRING"),
+  make_option(c("--case_label"), type="character", default="case", help="Label for the case cohort (default: %default).", metavar="STRING"),
+  make_option(c("--control_label"), type="character", default="control", help="Label for the control cohort (default: %default).", metavar="STRING"),
+	make_option(c("--genome"), type="character", default="hg19", help="Reference genome version (default: %default).", metavar="STRING"),
+	# Annotation and Score Thresholds
+  make_option(c("--clip_fdr"), type="numeric", default=0,  help="FDR value of volcano plot to clip (default: %default).", metavar="NUM"),
+	make_option(c("--fdr_threshold"), type="numeric", default=0.1,  help="FDR threshold for annotation scoring (default: %default).", metavar="NUM"),
+	make_option(c("--fc_threshold"), type="numeric", default=1.15,  help="Fold-change threshold for annotation scoring (default: %default).", metavar="NUM"),
+	make_option(c("--frac_patients_threshold"), type="numeric", default=0.01,  help="Minimum fraction of patients required to retain an interval (default: %default).", metavar="NUM"),
+	make_option(c("--score_threshold"), type="numeric", default=0.5, help="Annotation confidence threshold (default: %default).", metavar="NUM"),
+	make_option(c("--min_seg_size"), type="integer", default=5e4, help="Minimum segment size (base pairs) for significance (default: %default).", metavar="INT"),
+	make_option(c("--n_obs_threshold"), type="integer", default=5, help="Minimum number of observations (samples) required for significance (default: %default).", metavar="INT"),
+  # Additional files for driver gene annotations
+  make_option(c("--drivers_amp_file"), type="character", default=NA, help="Path to drivers.amp.txt file for driver gene annotation (default: %default).", metavar="FILE"),
+  make_option(c("--drivers_del_file"), type="character", default=NA, help="Path to drivers.del.txt file for driver gene annotation (default: %default).", metavar="FILE"),
+  make_option(c("--gencode"), type="character", default=NULL, help="Path to ABSOLUTE gencode genes for driver gene annotation (default: %default).", metavar="FILE"),
+  make_option(c("--chr_arms"), type="character", default=NULL, help="Path to ABSOLUTE chromosome arms data for driver gene annotation (default: %default).", metavar="FILE")
+)
+parser <- OptionParser(option_list=option_list)
+opt <- parse_args(parser)
+
+# Explicitly check for required arguments (those defined with default=NULL)
+required_args <- c("case_regions", "control_regions", "outdir")
+missing_args <- required_args[sapply(opt[required_args], is.null)]
+if (length(missing_args) > 0) {
+  stop(paste("Missing arguments:", paste(paste0("--", missing_args), collapse=", ")))
+}
+
 get_script_dir <- function() {
   # Check for 'Rscript' execution (most reliable for command-line tools)
   cmd_args <- commandArgs(trailingOnly = FALSE)
@@ -29,49 +66,23 @@ get_script_dir <- function() {
   return(".")
 }
 project_root <- get_script_dir()
-gencode_default_path <- file.path(project_root, "data-raw", "hg19", "gencode.hg19.genes.RData")
-chr_arms_default_path <- file.path(project_root, "data-raw", "hg19", "hg19_ChrArmsDat.RData")
-
-# Parse command line arguments #################################################
-option_list = list(
-	## REQUIRED
-	make_option(c("--case_regions"), type="character", default=NULL, help="Path to the case cngpld_sig-regions file (REQUIRED).", metavar="FILE"),
-	make_option(c("--control_regions"), type="character", default=NULL, help="Path to the control cngpld_sig-regions file (REQUIRED).", metavar="FILE"),
-	make_option(c("--outdir"), type="character", default=NULL, help="Output directory for all results and cache (REQUIRED).", metavar="DIR"),
-
-	## OPTIONAL
-  make_option(c("--case"), type="character", default="case", help="Label for the case cohort (default: %default).", metavar="STRING"),
-  make_option(c("--control"), type="character", default="control", help="Label for the control cohort (default: %default).", metavar="STRING"),
-	make_option(c("--genome"), type="character", default="hg19", help="Reference genome version (default: %default).", metavar="STRING"),
-	# Annotation and Score Thresholds
-	make_option(c("--fdr_threshold"), type="numeric", default=0.1,  help="FDR threshold for annotation scoring (default: %default).", metavar="NUM"),
-  make_option(c("--clip_fdr"), type="numeric", default=0,  help="FDR value of volcano plot to clip (default: %default).", metavar="NUM"),
-	make_option(c("--fc_threshold"), type="numeric", default=1.15,  help="Fold-change threshold for annotation scoring (default: %default).", metavar="NUM"),
-	make_option(c("--frac_patients_threshold"), type="numeric", default=0.01,  help="Minimum fraction of patients required to retain an interval (default: %default).", metavar="NUM"),
-	make_option(c("--score_threshold"), type="numeric", default=0.5, help="Annotation confidence threshold (default: %default).", metavar="NUM"),
-	make_option(c("--min_seg_size"), type="integer", default=5e4, help="Minimum segment size (base pairs) for significance (default: %default).", metavar="INT"),
-	make_option(c("--n_obs_threshold"), type="integer", default=5, help="Minimum number of observations (samples) required for significance (default: %default).", metavar="INT"),
-  # Additional files for driver gene annotations
-  make_option(c("--drivers_amp_file"), type="character", default=NA, help="Path to drivers.amp.txt file for driver gene annotation (default: %default).", metavar="FILE"),
-  make_option(c("--drivers_del_file"), type="character", default=NA, help="Path to drivers.del.txt file for driver gene annotation (default: %default).", metavar="FILE"),
-  make_option(c("--gencode"), type="character", default=gencode_default_path, help="Path to ABSOLUTE gencode genes for driver gene annotation (default: %default).", metavar="FILE"),
-  make_option(c("--chr_arms"), type="character", default=chr_arms_default_path, help="Path to ABSOLUTE chromosome arms data for driver gene annotation (default: %default).", metavar="FILE")
-)
-parser <- OptionParser(option_list=option_list)
-opt <- parse_args(parser)
-
-# Explicitly check for required arguments (those defined with default=NULL)
-required_args <- c("case_regions", "control_regions", "outdir")
-missing_args <- required_args[sapply(opt[required_args], is.null)]
-if (length(missing_args) > 0) {
-  stop(paste("Missing arguments:", paste(paste0("--", missing_args), collapse=", ")))
+if (is.null(opt$gencode)) {
+  opt$gencode <- file.path(project_root, "data-raw", opt$genome, paste0("gencode.", opt$genome, ".genes.RData"))
+}
+if (is.null(opt$chr_arms)) {
+  opt$chr_arms <- file.path(project_root, "data-raw", opt$genome, paste0(opt$genome, "_ChrArmsDat.RData"))
 }
 
-print(opt) # Print all parsed options for monitoring
+cat("Input options:\n")
+for (name in names(opt)) {
+  cat(sprintf("  %s: %s\n", name, toString(opt[[name]])))
+}
 case_regions <- opt$case_regions
-case <- opt$case
+case_tag <- opt$case_tag
+case_label <- opt$case_label
 control_regions <- opt$control_regions
-control <- opt$control
+control_tag <- opt$control_tag
+control_label <- opt$control_label
 outdir <- opt$outdir
 genome <- opt$genome
 fdr_threshold <- opt$fdr_threshold
@@ -88,30 +99,11 @@ chr_arms_file <- opt$chr_arms
 
 dir.create(paste0(outdir), showWarnings = FALSE, recursive = TRUE)
 
-# # Function to extract file label from path
-# get_file_label <- function(filepath) {
-# 	if (is.na(filepath)) {
-# 		return(NA_character_)
-# 	}
-# 	base_name <- basename(filepath)
-# 	# Removes everything from the first dot to the end
-# 	label <- sub("\\..*$", "", base_name)
-# 	return(label)
-# }
-
-# case <- get_file_label(case_regions)
-# case <- sub("^cngpld_sig-regions_", "", case)
-# control <- get_file_label(control_regions)
-# control <- sub("^cngpld_sig-regions_", "", control)
-# print(case)
-# print(control)
-# fits.fn <- paste0(outdir, "/cngpld/", case, "-vs-", control, ".rds")
-
 # Load Data ###################################################################
 regions.case <- io::qread(case_regions)
 regions.control <- io::qread(control_regions)
-regions.case$cohort <- case
-regions.control$cohort <- control
+regions.case$cohort <- case_tag
+regions.control$cohort <- control_tag
 
 regions.all <- rbind(
   data.frame(filter(regions.case, type == "Amp"), group = "Amplification"),
@@ -146,11 +138,12 @@ def_score <- function(fdr, fc) {
 }
 fdr_sig_threshold_from_score <- function(score) { 
   return( function(fc) { return( invx(invsig( score / sig(x_abslog(fc, t = fc_threshold)) ), t = fdr_threshold, base = 10) ) } ) 
-  }
+}
 
 # Already set at the end of cngpld run:
 # regions.all$score <- sig(x_abslog(regions.all$fdr, t=fdr_threshold)) * sig(x_abslog(regions.all$fc, t=fc_threshold))
 
+# The non-significant group is just for annotation purposes:
 idx <- with(
   regions.all,
   frac_patients >= frac_patients_threshold
@@ -158,16 +151,10 @@ idx <- with(
   # & score >= score_threshold  # data is colored by score
   & end - start + 1 > min_seg_size  # intervals are padded
 )
-
-if ("is_significant" %in% colnames(regions.all)) {
-  # If it is NOT "S" (meaning it is "NS"), exclude it from significance
-  idx <- idx & (regions.all$is_significant == "S")
-}
-
 regions.all$group[!idx] <- "non-significant"
 
-regions.all$gene <- NA
 
+regions.all$gene <- NA
 
 if (file.exists(drivers_amp_file) & file.exists(drivers_del_file) & file.exists(chr_arms_file) & file.exists(gencode_file)) {
   cat("Annotating intervals with pre-selected nominated driver genes...\n")
@@ -304,8 +291,6 @@ mix_to_grey_vec <- function(col, w, grey = "#BFBFBF", darker = FALSE) {
 
 xmin = 1 / 1.1 * min(regions.all$fc[regions.all$fdr < 5 * fdr_threshold])
 xmax = 1.1     * max(regions.all$fc[regions.all$fdr < 5 * fdr_threshold])
-# xmin = 0.45
-# xmax = 2
 
 plot_vulcano_combined <- function(amp_regions, del_regions, suffix = "both") {
   group_colors <- c(
@@ -350,10 +335,10 @@ plot_vulcano_combined <- function(amp_regions, del_regions, suffix = "both") {
         "text",
         x     = c(x_left, x_right),
         y     = c(ymin, ymin),
-        label = c(control, case),
+        label = c(control_label, case_label),
         hjust = c(1, 0),
         vjust = -1,
-        size  = 4
+        size  = 4.5
       )
     } else {
       ytrans = log_trans(10)
@@ -462,8 +447,8 @@ plot_vulcano_combined <- function(amp_regions, del_regions, suffix = "both") {
       ) +
       scale_size_continuous(
         name   = if (!is_top) "Fraction of patients\nwith event" else NULL,
-        range  = c(0.1, 4),
-        breaks = if (!is_top) c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1) else waiver(),
+        range  = c(0.1, 5),
+        breaks = if (!is_top) c(0.25, 0.5, 0.75) else waiver(),
         labels = if (!is_top) scales::percent_format(accuracy = 1) else waiver(),
         guide  = if (is_top) "none" else guide_legend(
           override.aes = list(
@@ -525,11 +510,11 @@ plot_vulcano_combined <- function(amp_regions, del_regions, suffix = "both") {
     theme(legend.position = "right")
 
   ggsave(
-    filename = paste0(outdir, "/vulcano_", case, "-vs-", control, ".pdf"),
+    filename = paste0(outdir, "/vulcano_", case_tag, "-vs-", control_tag, ".pdf"),
     plot = final_plot,
     width = 8, height = 7
   )
 }
 
 plot_vulcano_combined(regions.all[regions.all$type == "Amp", ], regions.all[regions.all$type == "Del", ], suffix="both")
-cat(paste0("Saved volcano plot to: ", outdir, "/vulcano_", case, "-vs-", control, ".pdf\n"))
+cat(paste0("Saved volcano plot to: ", outdir, "/vulcano_", case_tag, "-vs-", control_tag, ".pdf\n"))

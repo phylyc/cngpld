@@ -4,8 +4,8 @@ process_cn_regions <- function(regions) {
 		NULL
 	} else {
 		# convert position from Mbp back to bp
-		regions$start <- regions$start * 1e6;
-		regions$end <- regions$end * 1e6;
+		regions$start <- regions$start * 1e6
+		regions$end <- regions$end * 1e6
 
 		if (is.null(regions)) {
 			NULL
@@ -34,8 +34,8 @@ combine_regions <- function(regions) {
 			names(regions),
 			SIMPLIFY = FALSE
 		)
-	);
-	rownames(combined) <- NULL;
+	)
+	rownames(combined) <- NULL
 
 	combined
 }

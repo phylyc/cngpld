@@ -38,6 +38,7 @@ option_list = list(
 	make_option(c("--score_threshold"), type="numeric", default=0.5, help="Annotation confidence threshold (default: %default).", metavar="NUM"),
 	make_option(c("--min_seg_size"), type="integer", default=5e4, help="Minimum segment size (base pairs) for significance (default: %default).", metavar="INT"),
 	make_option(c("--n_obs_threshold"), type="integer", default=5, help="Minimum number of observations (samples) required for significance (default: %default).", metavar="INT"),
+	make_option(c("--font_size_scale"), type="numeric", default=3.3, help="Scale for font size of annotations (default: %default).", metavar="NUM"),
   # Additional files for driver gene annotations
   make_option(c("--drivers_amp_file"), type="character", default=NA, help="Path to drivers.amp.txt file for driver gene annotation (default: %default).", metavar="FILE"),
   make_option(c("--drivers_del_file"), type="character", default=NA, help="Path to drivers.del.txt file for driver gene annotation (default: %default).", metavar="FILE"),
@@ -92,6 +93,7 @@ frac_patients_threshold <- opt$frac_patients_threshold
 score_threshold <- opt$score_threshold
 min_seg_size <- opt$min_seg_size
 n_obs_threshold <- opt$n_obs_threshold
+font_size_scale <- opt$font_size_scale
 drivers_amp_file <- opt$drivers_amp_file
 drivers_del_file <- opt$drivers_del_file
 gencode_file <- opt$gencode
@@ -105,12 +107,12 @@ regions.control <- io::qread(control_regions)
 regions.case$cohort <- case_tag
 regions.control$cohort <- control_tag
 
-regions.all <- rbind(
-  data.frame(filter(regions.case, type == "Amp"), group = "Amplification"),
-  data.frame(filter(regions.case, type == "Del"), group = "Deletion"),
-  data.frame(filter(regions.control, type == "Amp"), group = "Amplification"),
-  data.frame(filter(regions.control, type == "Del"), group = "Deletion")
-) %>%
+regions.all <- bind_rows(
+    mutate(regions.case, chromosome = as.character(chromosome)),
+    mutate(regions.control, chromosome = as.character(chromosome))
+  ) %>%
+  filter(type %in% c("Amp", "Del")) %>%
+  mutate(group = recode(type, Amp = "Amplification", Del = "Deletion")) %>%
   mutate(
     fc = exp(ldiff),
     fdr = pmax(fdr, clip_fdr),
@@ -127,17 +129,17 @@ invx <- function(y, t = exp(1), base = 10) { return( base^(-x_abslog(f=t, t=base
 
 # evidence / significance / signal score defined in run.cngpld.R
 beta = -log(fdr_threshold)
-sig <- function(x) { 
-  return( 1 - exp(-beta * x) ) 
+sig <- function(x) {
+  return( 1 - exp(-beta * x) )
 }  # 1 - exp(beta * log(f) / log(t)) = 1 - f ^ (beta / log(t))
-invsig <- function(y) { 
-  return( -log1p(-y) / beta ) 
+invsig <- function(y) {
+  return( -log1p(-y) / beta )
 }
-def_score <- function(fdr, fc) { 
-  return(sig(x_abslog(fdr, t=fdr_threshold)) * sig(x_abslog(fc, t=fc_threshold)) ) 
+def_score <- function(fdr, fc) {
+  return(sig(x_abslog(fdr, t=fdr_threshold)) * sig(x_abslog(fc, t=fc_threshold)) )
 }
-fdr_sig_threshold_from_score <- function(score) { 
-  return( function(fc) { return( invx(invsig( score / sig(x_abslog(fc, t = fc_threshold)) ), t = fdr_threshold, base = 10) ) } ) 
+fdr_sig_threshold_from_score <- function(score) {
+  return( function(fc) { return( invx(invsig( score / sig(x_abslog(fc, t = fc_threshold)) ), t = fdr_threshold, base = 10) ) } )
 }
 
 # Already set at the end of cngpld run:
@@ -183,7 +185,7 @@ if (file.exists(drivers_amp_file) & file.exists(drivers_del_file) & file.exists(
   genes <- genes[, .(HGNC, Chr = chr, Start = i.start, End = i.end, Arm = arm)]
 
   suppressWarnings({
-    pad <- 1.5 * 1e6
+    pad <- 2 * 1e6
     for (g in amps) {
       gene <- genes[genes$HGNC == g, ]
       hits <- (
@@ -289,8 +291,9 @@ mix_to_grey_vec <- function(col, w, grey = "#BFBFBF", darker = FALSE) {
   }, col, w)
 }
 
-xmin = 1 / 1.1 * min(regions.all$fc[regions.all$fdr < 5 * fdr_threshold])
-xmax = 1.1     * max(regions.all$fc[regions.all$fdr < 5 * fdr_threshold])
+hits_to_plot <- regions.all$fdr < 5 * fdr_threshold & regions.all$group != "non-significant"
+xmin <- 1 / 1.1 * min(regions.all$fc[hits_to_plot])
+xmax <- 1.1     * max(regions.all$fc[hits_to_plot])
 
 plot_vulcano_combined <- function(amp_regions, del_regions, suffix = "both") {
   group_colors <- c(
@@ -470,7 +473,7 @@ plot_vulcano_combined <- function(amp_regions, del_regions, suffix = "both") {
         min.segment.length = 0,
         force = 4,
         max.time = 1,
-        aes(x = fc, y = fdr, label = gene, size = 3.3 * score, colour = I(mixed_text_col))
+        aes(x = fc, y = fdr, label = gene, size = font_size_scale * score, colour = I(mixed_text_col))
       ) +
       scale_size_identity(guide = "none") +
 

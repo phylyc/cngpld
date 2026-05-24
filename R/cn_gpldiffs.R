@@ -25,15 +25,15 @@ summary.cn_gpldiffs <- function(object, direction=1, genome=NULL, lodds.cut=10, 
 				function(fit) {
 					gpldiff::find_sig_regions(
 						fit$model, fit$data, direction=direction, process=FALSE, lodds.cut=lodds.cut, ...
-					);
+					)
 				}
 			)
 		}
-	);
+	)
 
 	regions <- mcmapply(
 		function(rset, type) {
-			d <- gpldiff::process_regions(combine_regions(rset), direction=direction);
+			d <- gpldiff::process_regions(combine_regions(rset), direction=direction)
 			if (!is.null(d) && nrow(d) > 0) {
 				data.frame(type = type, d)
 			} else {
@@ -42,7 +42,7 @@ summary.cn_gpldiffs <- function(object, direction=1, genome=NULL, lodds.cut=10, 
 		},
 		rsets, c("Amp", "Del"),
 		SIMPLIFY=FALSE
-	);
+	)
 
 	rs <- process_cn_regions(rbind(regions$amp, regions$del))
 

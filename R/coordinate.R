@@ -8,7 +8,7 @@ coordinate_to_string <- function(x) {
 
 # NB this is human specific
 chromname_to_integer <- function(s, species="hsa") {
-	s <- gsub("chr", "", as.character(s), fixed=TRUE);
+	s <- gsub("chr", "", as.character(s), fixed=TRUE)
 	if (species == "hsa") {
 		ifelse(s == "X", 23,
 			ifelse(s == "Y", 24,
@@ -18,7 +18,7 @@ chromname_to_integer <- function(s, species="hsa") {
 			)
 		)
 	} else {
-		stop("Species ", species, " is not supported.");
+		stop("Species ", species, " is not supported.")
 	}
 }
 
@@ -32,16 +32,16 @@ integer_to_chromname <- function(x, species="hsa") {
 			)
 		)
 	} else {
-		stop("Species ", species, " is not supported.");
+		stop("Species ", species, " is not supported.")
 	}
 }
 
 string_to_coordinate <- function(s) {
 	# removed parenthesized tokens
-	s <- gsub("\\(.*\\)", "", s);
+	s <- gsub("\\(.*\\)", "", s)
 	# split on : or -
 	# illegal expression can be parsed here too
-	tokenss <- strsplit(s, ":|-");
+	tokenss <- strsplit(s, ":|-")
 	do.call(rbind, lapply(
 		tokenss,
 		function(tokens) {

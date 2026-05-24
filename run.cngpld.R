@@ -29,17 +29,22 @@ option_list = list(
   make_option(c("--control_label"), type="character", default="control", help="Label for the control cohort (default: %default).", metavar="STRING"),
 	make_option(c("--genome"), type="character", default="hg19", help="Reference genome version (default: %default).", metavar="STRING"),
 	make_option(c("--use_cache"), action="store_true", default=FALSE, help="Flag to enable caching of the model (default: FALSE)."),
+	make_option(c("--is_paired"), action="store_true", default=FALSE, help="Whether case and control cohorts are paired samples from the same patients (default: FALSE)."),
 	# Statistical & CNV Thresholds
-	make_option(c("--lodds_cut"), type="numeric", default=3, help="Probability of discovery cut-off (default: %default).", metavar="NUM"),
+	make_option(c("--lodds_cut"), type="numeric", default=5, help="Probability of discovery cut-off (default: %default).", metavar="NUM"),
+	make_option(c("--cn_res"), type="numeric", default=100, help="Aggregated log copy-ratio signal resolution 1/cn.res (default: %default).", metavar="NUM"),
 	make_option(c("--min_tCR"), type="numeric", default=0.3, help="Absolute copy-ratio threshold for CNV summary stats (default: %default).", metavar="NUM"),
+	make_option(c("--max_tCR"), type="numeric", default=3.5, help="Cap maximum total copy-ratio to avoid differential signal being dominated by differences in amount of cDNA amplifications (default: %default).", metavar="NUM"),
 	make_option(c("--min_nprobes"), type="integer", default=4,  help="Minimum number of probes supporting a segment (default: %default).", metavar="INT"),
+	make_option(c("--sigma2_concentration"), type="numeric", default=0.1, help="Prior concentration of sigma^2 (default: %default).", metavar="NUM"),
+	make_option(c("--weight_by_cohort_size"), action="store_true", default=FALSE, help="Weight uncertainty by cohort size (default: FALSE)."),
 	# Annotation and Score Thresholds
 	make_option(c("--fdr_threshold"), type="numeric", default=0.1,  help="FDR threshold for annotation scoring (default: %default).", metavar="NUM"),
 	make_option(c("--fc_threshold"), type="numeric", default=1.15,  help="Fold-change threshold for annotation scoring (default: %default).", metavar="NUM"),
 	make_option(c("--frac_patients_threshold"), type="numeric", default=0.1, help="Minimum fraction of patients required to retain an interval (default: %default).", metavar="NUM"),
 	make_option(c("--score_threshold"), type="numeric", default=0.5, help="Annotation confidence threshold (default: %default).", metavar="NUM"),
 	make_option(c("--min_seg_size"), type="integer", default=5e4, help="Minimum segment size (base pairs) for significance (default: %default).", metavar="INT"),
-	make_option(c("--n_obs_threshold"), type="integer", default=5, help="Minimum number of observations (samples) required for significance (default: %default).", metavar="INT"),
+	make_option(c("--n_obs_threshold"), type="integer", default=5, help="Minimum number of observations (probes) required for significance (default: %default).", metavar="INT"),
   make_option(c("--n_cores"), type="integer", default=1, help="Number of CPU cores to use (default: %default).", metavar="INT")
 )
 parser <- OptionParser(option_list=option_list)
@@ -63,9 +68,14 @@ control_tag <- opt$control_tag
 outdir <- opt$outdir
 genome <- opt$genome
 use_cache <- opt$use_cache
+is_paired <- opt$is_paired
 lodds_cut <- opt$lodds_cut
+cn_res <- opt$cn_res
 min_tCR <- opt$min_tCR
+max_tCR <- opt$max_tCR
 min_nprobes <- opt$min_nprobes
+sigma2_concentration <- opt$sigma2_concentration
+weight_by_cohort_size <- opt$weight_by_cohort_size
 fdr_threshold <- opt$fdr_threshold
 fc_threshold <- opt$fc_threshold
 frac_patients_threshold <- opt$frac_patients_threshold
@@ -79,11 +89,11 @@ dir.create(paste0(outdir), showWarnings = FALSE, recursive = TRUE)
 # Run analysis ################################################################
 seg.case <- cngpld::read_seg(
   case_file
-) %>% mutate( logr = pmax(log(2) * logr, -3) ) %>% filter( nprobes >= min_nprobes )
+) %>% mutate( logr = pmin(pmax(-3, log(2) * logr), max_tCR) ) %>% filter( nprobes >= min_nprobes )
 
 seg.control <- cngpld::read_seg(
   control_file
-) %>% mutate( logr = pmax(log(2) * logr, -3) ) %>% filter( nprobes >= min_nprobes )
+) %>% mutate( logr = pmin(pmax(-3, log(2) * logr), max_tCR) ) %>% filter( nprobes >= min_nprobes )
 
 fits.fn <- paste0(outdir, "/", case_tag, "-vs-", control_tag, ".rds")
 if (file.exists(fits.fn) & use_cache) {
@@ -92,6 +102,11 @@ if (file.exists(fits.fn) & use_cache) {
 
 } else {
 
+  hparams <- cngpld::default_hparams()
+  sigma2_mode <- 0.1 / (1 + 0.1)  # default mode from settings alpha=0.1 and beta=0.1
+  hparams$alpha <- sigma2_concentration
+  hparams$beta <- sigma2_mode * (1 + sigma2_concentration)
+
   options(mc.cores = n_cores)
   fits <- cngpld::compare_segs(
     seg.case,
@@ -99,8 +114,12 @@ if (file.exists(fits.fn) & use_cache) {
     genome = genome,
     cn.cut = min_tCR,  # absolute threshold for copy-number log ratio to be considered in summary statistics
     smooth = TRUE,  # whether to median smooth the copy-number data
-    cn.res = 1e4,  # aggregated log copy-ratio signal resolution 1/cn.res
-    pair = FALSE,  # whether case and control cohorts are paired samples from the same patients
+    cn.res = cn_res,  # aggregated log copy-ratio signal resolution 1/cn.res
+    pair = is_paired,  # whether case and control cohorts are paired samples from the same patients
+    hparams = hparams,
+    adapt = "none",
+    weight.N.ref = 100,
+    weight_by_cohort_size = weight_by_cohort_size,
     verbose = 1,
   )
 

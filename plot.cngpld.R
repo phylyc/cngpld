@@ -449,7 +449,7 @@ plot_vulcano_combined <- function(amp_regions, del_regions, suffix = "both") {
         )
       ) +
       scale_size_continuous(
-        name   = if (!is_top) "Fraction of patients\nwith event" else NULL,
+        name   = if (!is_top) "% patients\nwith event" else NULL,
         range  = c(0.1, 5),
         breaks = if (!is_top) c(0.25, 0.5, 0.75) else waiver(),
         labels = if (!is_top) scales::percent_format(accuracy = 1) else waiver(),
@@ -486,6 +486,7 @@ plot_vulcano_combined <- function(amp_regions, del_regions, suffix = "both") {
         axis.text.x.top = if (!is_top) element_text(size=7.5, margin = margin(b = 5.3, t = -100)) else element_blank(),  # get x tick labels from bottom panel
         axis.line.x.bottom = if (!is_top) element_blank() else element_line(),
         axis.line.y = element_blank(),
+        axis.text.y.left = element_text(size=7.5),
         panel.grid.major = element_line(color = "grey90", linewidth = 0.5),
         panel.grid.minor = element_line(color = "grey95", linewidth = 0.25)
       ) +
@@ -501,7 +502,7 @@ plot_vulcano_combined <- function(amp_regions, del_regions, suffix = "both") {
       ) +
       title +
       coord_cartesian(clip = "off") +   # allow drawing outside panel
-      xlab(if (!is_top) paste0("CNV summary statistic fold-change") else NULL) +
+      xlab(if (!is_top) paste0("CNV summary statistic contrast") else NULL) +
       ylab(paste("false discovery rate", if (is_top) "(AMP)" else "(DEL)"))
   }
 

@@ -1,3 +1,4 @@
+#' @export
 default_hparams <- function() {
 	list(
 		nu2 = 5^2,

@@ -14,19 +14,40 @@ read_seg <- function(file, ...) {
 
 	header <- scan(f, character(), sep="\t", nlines=1, comment.char="#", quiet=TRUE)
 
-	# continue reading the file connection
-	# assume first four columns are:
-	# name (character), chromosome (character), start (integer), end (integer)
-	x <- read.table(f, sep="\t", header=FALSE,
-		colClasses=c("character", "character", "numeric", "numeric",
-			rep("numeric", length(header)-4)), ...)
-	colnames(x) <- header
+	# Assume first four columns are:
+	# sample, chromosome, start, end
+	x <- read.table(
+			f,
+			sep = "\t",
+			header = FALSE,
+			colClasses = c(
+					"character",
+					"character",
+					"numeric",
+					"numeric",
+					rep("numeric", length(header) - 4L)
+			),
+			...
+	)
 
 	if (is.character(file)) {
 		close(f)
 	}
 
-	colnames(x) <- c("sample", "chromosome", "start", "end", "nprobes", "logr")
+	canonical_names <- c(
+			"sample", "chromosome", "start", "end",
+			"nprobes", "logr", "length"
+	)
+
+	# Discard columns after the seventh
+	x <- x[, seq_len(min(ncol(x), 7L)), drop = FALSE]
+
+	# Require at least the six essential columns
+	if (ncol(x) < 6L) {
+			stop("Expected at least 6 columns, but found ", ncol(x))
+	}
+
+	names(x) <- canonical_names[seq_len(ncol(x))]
 
 	x
 }

@@ -39,6 +39,11 @@ option_list = list(
 	make_option(c("--min_seg_size"), type="integer", default=5e4, help="Minimum segment size (base pairs) for significance (default: %default).", metavar="INT"),
 	make_option(c("--n_obs_threshold"), type="integer", default=5, help="Minimum number of observations (samples) required for significance (default: %default).", metavar="INT"),
 	make_option(c("--font_size_scale"), type="numeric", default=3.3, help="Scale for font size of annotations (default: %default).", metavar="NUM"),
+  # Figure geometry. The canvas grows beyond fig_width/fig_height as needed to fit labels
+  # that are drawn outside the panels; the panels themselves keep the size set here.
+  make_option(c("--fig_width"), type="numeric", default=8, help="Width (inches) of the plotting canvas (default: %default).", metavar="NUM"),
+  make_option(c("--fig_height"), type="numeric", default=7, help="Height (inches) of the plotting canvas (default: %default).", metavar="NUM"),
+  make_option(c("--fig_margin"), type="numeric", default=0.02, help="Extra padding (inches) around the figure (default: %default).", metavar="NUM"),
   # Additional files for driver gene annotations
   make_option(c("--drivers_amp_file"), type="character", default=NA, help="Path to drivers.amp.txt file for driver gene annotation (default: %default).", metavar="FILE"),
   make_option(c("--drivers_del_file"), type="character", default=NA, help="Path to drivers.del.txt file for driver gene annotation (default: %default).", metavar="FILE"),
@@ -94,6 +99,9 @@ score_threshold <- opt$score_threshold
 min_seg_size <- opt$min_seg_size
 n_obs_threshold <- opt$n_obs_threshold
 font_size_scale <- opt$font_size_scale
+fig_width <- opt$fig_width
+fig_height <- opt$fig_height
+fig_margin <- opt$fig_margin
 drivers_amp_file <- opt$drivers_amp_file
 drivers_del_file <- opt$drivers_del_file
 gencode_file <- opt$gencode
@@ -102,15 +110,37 @@ chr_arms_file <- opt$chr_arms
 dir.create(paste0(outdir), showWarnings = FALSE, recursive = TRUE)
 
 # Load Data ###################################################################
-regions.case <- io::qread(case_regions)
-regions.control <- io::qread(control_regions)
-regions.case$cohort <- case_tag
-regions.control$cohort <- control_tag
 
-regions.all <- bind_rows(
-    mutate(regions.case, chromosome = as.character(chromosome)),
-    mutate(regions.control, chromosome = as.character(chromosome))
-  ) %>%
+# Exit cleanly (no plot file) when there is nothing plottable: an empty cohort is a
+# legitimate result, not an error, and callers should not have to handle a crash.
+exit_no_plot <- function(...) {
+  cat(paste0(..., "\nNo volcano plot produced.\n"))
+  quit(save = "no", status = 0)
+}
+
+read_regions <- function(path, tag) {
+  if (!file.exists(path) || file.info(path)$size == 0) {
+    cat(sprintf("Region file is missing or empty: %s\n", path))
+    return(NULL)
+  }
+  regions <- io::qread(path)
+  if (is.null(regions) || nrow(regions) == 0) {
+    cat(sprintf("No regions in: %s\n", path))
+    return(NULL)
+  }
+  regions$cohort <- tag
+  return(mutate(regions, chromosome = as.character(chromosome)))
+}
+
+regions.case <- read_regions(case_regions, case_tag)
+regions.control <- read_regions(control_regions, control_tag)
+
+regions.all <- bind_rows(regions.case, regions.control)
+if (nrow(regions.all) == 0) {
+  exit_no_plot("Neither cohort contributed any region.")
+}
+
+regions.all <- regions.all %>%
   filter(type %in% c("Amp", "Del")) %>%
   mutate(group = recode(type, Amp = "Amplification", Del = "Deletion")) %>%
   mutate(
@@ -119,6 +149,16 @@ regions.all <- bind_rows(
     chr = paste0(chromosome, arm)
   ) %>%
   arrange(score)  # draw lower score points first.
+
+# fc and fdr are drawn on log axes, so non-finite/non-positive values cannot be placed.
+n_undrawable <- sum(!(is.finite(regions.all$fc) & regions.all$fc > 0 & is.finite(regions.all$fdr)))
+if (n_undrawable > 0) {
+  cat(sprintf("Dropping %d region(s) with non-finite fold change or FDR.\n", n_undrawable))
+  regions.all <- regions.all %>% filter(is.finite(fc), fc > 0, is.finite(fdr))
+}
+if (nrow(regions.all) == 0) {
+  exit_no_plot("No Amp/Del region with a finite fold change and FDR.")
+}
 regions.all$group <- factor(regions.all$group, levels = c("Amplification", "Deletion", "non-significant"))
 
 
@@ -184,48 +224,45 @@ if (file.exists(drivers_amp_file) & file.exists(drivers_del_file) & file.exists(
   genes <- foverlaps(gencode.dt, chr.arms.dt, type = "within", nomatch = NA)
   genes <- genes[, .(HGNC, Chr = chr, Start = i.start, End = i.end, Arm = arm)]
 
-  suppressWarnings({
-    pad <- 2 * 1e6
-    for (g in amps) {
-      gene <- genes[genes$HGNC == g, ]
+  pad <- 2 * 1e6
+  annotate_drivers <- function(regions, symbols, region_type) {
+    for (g in symbols) {
+      loci <- genes[genes$HGNC == g, ]
+      if (nrow(loci) == 0) {
+        next  # symbol is not in the gencode reference
+      }
+      # A symbol can sit at more than one locus - PPP2R3B, for instance, is annotated on
+      # both Xp and Yp. Testing the region against all loci at once recycles the shorter
+      # vector: it mis-assigns rows, and errors outright when there is a single region.
+      near <- Reduce(`|`, lapply(seq_len(nrow(loci)), function(k) {
+        regions$chr == loci$Arm[k] &
+          regions$start - pad <= loci$End[k] &
+          regions$end + pad >= loci$Start[k]
+      }))
       hits <- (
-        regions.all$chr == gene$Arm
-        & regions.all$start - pad <= gene$End
-        & regions.all$end + pad >= gene$Start
-        & regions.all$type == "Amp"
-        & regions.all$group != "non-significant"
-        & regions.all$score > score_threshold
+        near
+        & regions$type == region_type
+        & regions$group != "non-significant"
+        & regions$score > score_threshold
       )
-      regions.all$gene[hits] <- ifelse(
-        is.na(regions.all$gene[hits]) | regions.all$gene[hits] == "" | regions.all$gene[hits] == regions.all$chr[hits],
+      hits[is.na(hits)] <- FALSE
+      regions$gene[hits] <- ifelse(
+        is.na(regions$gene[hits]) | regions$gene[hits] == "" | regions$gene[hits] == regions$chr[hits],
         g,
-        paste(regions.all$gene[hits], g, sep = ",")
+        paste(regions$gene[hits], g, sep = ",")
       )
     }
+    return(regions)
+  }
 
-    for (g in dels) {
-      gene <- genes[genes$HGNC == g, ]
-      hits <- (
-        regions.all$chr == gene$Arm
-        & regions.all$start - pad <= gene$End
-        & regions.all$end + pad >= gene$Start
-        & regions.all$type == "Del"
-        & regions.all$group != "non-significant"
-        & regions.all$score > score_threshold
-      )
-      regions.all$gene[hits] <- ifelse(
-        is.na(regions.all$gene[hits]) | regions.all$gene[hits] == "" | regions.all$gene[hits] == regions.all$chr[hits],
-        g,
-        paste(regions.all$gene[hits], g, sep = ",")
-      )
-    }
-  })
+  regions.all <- annotate_drivers(regions.all, amps, "Amp")
+  regions.all <- annotate_drivers(regions.all, dels, "Del")
 
 } else {
   cat("Annotating intervals with chromosome arm/region...\n")
 
   # iterate over all rows in regions.case and annotate the chromosome arm/region:
-  for (i in 1:nrow(regions.all)) {
+  for (i in seq_len(nrow(regions.all))) {
     if (
       (regions.all$score[i] >= score_threshold)
         & (regions.all$group[i] != "non-significant")
@@ -284,6 +321,10 @@ mix_to_grey_vec <- function(col, w, grey = "#BFBFBF", darker = FALSE) {
   # col: vector of base colors (e.g. group colors)
   # w:   numeric in [0,1]
   # returns: vector of mixed colors
+  if (length(col) == 0) {
+    return(character(0))  # mapply() would return an empty list, not a colour vector
+  }
+  w <- ifelse(is.finite(w), pmin(pmax(w, 0), 1), 0)
   mapply(function(cc, ww) {
     ramp <- scales::colour_ramp(c(grey, cc))
     rramp <- scales::colour_ramp(c("#000000", ramp(ww)))
@@ -291,9 +332,68 @@ mix_to_grey_vec <- function(col, w, grey = "#BFBFBF", darker = FALSE) {
   }, col, w)
 }
 
-hits_to_plot <- regions.all$fdr < 5 * fdr_threshold & regions.all$group != "non-significant"
-xmin <- 1 / 1.1 * min(regions.all$fc[hits_to_plot])
-xmax <- 1.1     * max(regions.all$fc[hits_to_plot])
+text_width_in <- function(label, size) {
+  # size is a ggplot text size (mm); .pt converts it to a font size in points.
+  return(grid::convertWidth(
+    grid::grobWidth(grid::textGrob(label, gp = grid::gpar(fontsize = size * .pt))),
+    "in", valueOnly = TRUE
+  ))
+}
+
+# The cohort labels are drawn outside the panel (coord_cartesian(clip = "off")), so the
+# figure edge - not the panel - is what cuts them off. Measure how far they overhang and
+# return the outer margins that make room for them. The canvas is then grown by exactly
+# the extra margin, so the panels keep the size, and hence the aspect ratio, they have on
+# the base canvas.
+fit_outer_margin <- function(plot, width, height, pad = 0) {
+  grDevices::pdf(NULL, width = width, height = height)
+  on.exit(grDevices::dev.off(), add = TRUE)
+
+  gt <- suppressWarnings(patchwork::patchworkGrob(plot))  # the real render reports these
+  w <- grid::convertWidth(gt$widths, "in", valueOnly = TRUE)
+  h <- grid::convertHeight(gt$heights, "in", valueOnly = TRUE)
+  base <- c(t = h[1], r = w[length(w)], b = h[length(h)], l = w[1])  # patchwork's own margin
+
+  # The panel column is the only "null" width; null units convert to 0, so whatever the
+  # canvas has left over after the fixed columns is the panel.
+  panel_col <- which(grid::unitType(gt$widths) == "null")
+  cols <- seq_along(w)
+  panel_w <- width - sum(w)
+  inner_l <- sum(w[cols < min(panel_col) & cols != 1])              # y axis title and text
+  inner_r <- sum(w[cols > max(panel_col) & cols != length(w)])      # legend
+
+  # Panel-relative x of each label anchor (scale_x_continuous expands limits by 5%).
+  lim <- log2(c(xmin, xmax))
+  expand <- 0.05 * diff(lim)
+  rel <- (log2(c(x_left, x_right)) - (lim[1] - expand)) / (diff(lim) + 2 * expand)
+
+  # control_label is right-aligned at x_left, case_label left-aligned at x_right.
+  over_l <- text_width_in(control_label, cohort_label_size) - rel[1] * panel_w - inner_l
+  over_r <- text_width_in(case_label, cohort_label_size) - (1 - rel[2]) * panel_w - inner_r
+
+  margin <- pmax(base, c(t = 0, r = over_r, b = 0, l = over_l)) + pad
+  return(list(margin = margin, grow = margin - base))
+}
+
+hits_to_plot <- (regions.all$fdr < 5 * fdr_threshold) & (regions.all$group != "non-significant")
+if (!any(hits_to_plot)) {
+  exit_no_plot("No significant hits to plot.")
+}
+# The volcano is centred on fc = 1: the reference line, the cohort labels and every
+# non-significant point live around it. If all hits sit on one side (e.g. a single
+# strong amplification), a range derived from the hits alone excludes 1 entirely.
+# Every value in the other panel is then censored, its x scale trains to c(Inf, -Inf),
+# and the duplicated x axis dies in ggplot2's mono_test(). Keep 1 inside the range.
+fc_hits <- regions.all$fc[hits_to_plot]
+xmin <- 1 / 1.1 * min(1, fc_hits)
+xmax <- 1.1     * max(1, fc_hits)
+
+# Anchors of the two cohort labels above the top panel: midpoints in log2 space for the
+# left/right halves. Needed outside make_plot() to size the figure margins.
+cohort_label_size <- 4.5
+log2_mid <- min(abs(log2(xmin) / 5), abs(log2(xmax) / 5))
+x_left  <- 2^(-log2_mid)
+x_right <- 2^log2_mid
 
 plot_vulcano_combined <- function(amp_regions, del_regions, suffix = "both") {
   group_colors <- c(
@@ -302,11 +402,25 @@ plot_vulcano_combined <- function(amp_regions, del_regions, suffix = "both") {
     "non-significant" = "#BFBFBF"
   )
 
-  amp_ymin = min(amp_regions$fdr[amp_regions$group != "non-significant"]) / 1.2
-  del_ymin = min(del_regions$fdr[del_regions$group != "non-significant"]) / 1.2
+  # Panel floor: fall back to a default when a panel has no significant region, and
+  # ignore fdr == 0 (possible with clip_fdr = 0), which would push the log axis to -Inf.
+  fdr_axis_min <- function(fdr, default = 0.1) {
+    fdr <- fdr[is.finite(fdr) & fdr > 0]
+    if (length(fdr) == 0) {
+      return(default)
+    }
+    return(min(fdr) / 1.2)
+  }
+  sig_amp_fdr = amp_regions$fdr[amp_regions$group != "non-significant"]
+  sig_del_fdr = del_regions$fdr[del_regions$group != "non-significant"]
+  amp_ymin = fdr_axis_min(sig_amp_fdr)
+  del_ymin = fdr_axis_min(sig_del_fdr)
   ymax = 1
 
   height_ratio = (log(amp_ymin) - log(ymax)) / (log(del_ymin) - log(ymax))
+  if (!is.finite(height_ratio) || height_ratio <= 0) {
+    height_ratio = 1
+  }
 
   make_plot <- function(regions, is_top=FALSE) {
     ymin = if (is_top) amp_ymin else del_ymin
@@ -314,15 +428,6 @@ plot_vulcano_combined <- function(amp_regions, del_regions, suffix = "both") {
     xlim = c(xmin, xmax)
     xbreaks = 2^(floor(log2(xmin)):ceiling(log2(xmax)))
     label_func = function(x) trimws(formatC(x, format = "fg", drop0trailing = TRUE))
-
-    # midpoints in log2 space for left/right halves
-    log2_xmin <- log2(xmin)
-    log2_xmax <- log2(xmax)
-    log2_mid_left  <- (log2_xmin + log2(1)) / 5
-    log2_mid_right <- (log2(1) + log2_xmax) / 5
-    log2_mid <- min(abs(log2_mid_left), abs(log2_mid_right))
-    x_left  <- 2^(-log2_mid)
-    x_right <- 2^log2_mid
 
     if (is_top) {
       ytrans = revlog_trans(10)
@@ -341,7 +446,7 @@ plot_vulcano_combined <- function(amp_regions, del_regions, suffix = "both") {
         label = c(control_label, case_label),
         hjust = c(1, 0),
         vjust = -1,
-        size  = 4.5
+        size  = cohort_label_size
       )
     } else {
       ytrans = log_trans(10)
@@ -509,16 +614,52 @@ plot_vulcano_combined <- function(amp_regions, del_regions, suffix = "both") {
   amp_case_plot <- make_plot(amp_regions, is_top=TRUE)
   del_case_plot <- make_plot(del_regions)
 
-  final_plot <- (amp_case_plot / del_case_plot) +
-    plot_layout(guides = "collect", heights = c(height_ratio, 1)) &
-    theme(legend.position = "right")
+  panels <- (amp_case_plot / del_case_plot) +
+    plot_layout(guides = "collect", heights = c(height_ratio, 1))
+  legend_theme <- theme(legend.position = "right", legend.justification = "top")
 
-  ggsave(
-    filename = paste0(outdir, "/vulcano_", case_tag, "-vs-", control_tag, ".pdf"),
-    plot = final_plot,
-    width = 8, height = 7
+  # Widen the canvas until the cohort labels fit on it, keeping the panels' size fixed.
+  fit <- tryCatch(
+    fit_outer_margin(panels & legend_theme, fig_width, fig_height, pad = fig_margin),
+    error = function(e) {
+      cat(sprintf("Could not measure the figure margins (%s); using defaults.\n", conditionMessage(e)))
+      return(NULL)
+    }
   )
+  if (is.null(fit)) {
+    final_plot <- panels & legend_theme
+    canvas <- c(width = fig_width, height = fig_height)
+  } else {
+    final_plot <- panels +
+      plot_annotation(theme = theme(plot.margin = margin(
+        t = fit$margin[["t"]], r = fit$margin[["r"]],
+        b = fit$margin[["b"]], l = fit$margin[["l"]], unit = "in"
+      ))) &
+      legend_theme
+    canvas <- c(
+      width  = fig_width  + fit$grow[["l"]] + fit$grow[["r"]],
+      height = fig_height + fit$grow[["t"]] + fit$grow[["b"]]
+    )
+  }
+
+  # Render to a scratch file first so a failure never leaves a truncated PDF behind.
+  filename <- paste0(outdir, "/vulcano_", case_tag, "-vs-", control_tag, ".pdf")
+  tmpfile <- tempfile(fileext = ".pdf")
+  on.exit(unlink(tmpfile), add = TRUE)
+  ggsave(filename = tmpfile, plot = final_plot, width = canvas[["width"]], height = canvas[["height"]])
+  if (!file.copy(tmpfile, filename, overwrite = TRUE)) {
+    stop("Could not write ", filename)
+  }
+  return(filename)
 }
 
-plot_vulcano_combined(regions.all[regions.all$type == "Amp", ], regions.all[regions.all$type == "Del", ], suffix="both")
-cat(paste0("Saved volcano plot to: ", outdir, "/vulcano_", case_tag, "-vs-", control_tag, ".pdf\n"))
+amp_regions <- regions.all[regions.all$type == "Amp", ]
+del_regions <- regions.all[regions.all$type == "Del", ]
+for (panel in c("Amp", "Del")) {
+  if (sum(regions.all$type == panel) == 0) {
+    cat(sprintf("No %s region to plot - that panel stays empty.\n", panel))
+  }
+}
+
+saved <- plot_vulcano_combined(amp_regions, del_regions, suffix="both")
+cat(paste0("Saved volcano plot to: ", saved, "\n"))

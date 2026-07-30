@@ -32,6 +32,7 @@ option_list = list(
 	make_option(c("--genome"), type="character", default="hg19", help="Reference genome version (default: %default).", metavar="STRING"),
 	# Annotation and Score Thresholds
   make_option(c("--clip_fdr"), type="numeric", default=0,  help="FDR value of volcano plot to clip (default: %default).", metavar="NUM"),
+  make_option(c("--clip_fc"), type="numeric", default=NA,  help="FC value of volcano plot to clip (default: %default).", metavar="NUM"),
 	make_option(c("--fdr_threshold"), type="numeric", default=0.1,  help="FDR threshold for annotation scoring (default: %default).", metavar="NUM"),
 	make_option(c("--fc_threshold"), type="numeric", default=1.15,  help="Fold-change threshold for annotation scoring (default: %default).", metavar="NUM"),
 	make_option(c("--frac_patients_threshold"), type="numeric", default=0.01,  help="Minimum fraction of patients required to retain an interval (default: %default).", metavar="NUM"),
@@ -93,6 +94,10 @@ outdir <- opt$outdir
 genome <- opt$genome
 fdr_threshold <- opt$fdr_threshold
 clip_fdr <- opt$clip_fdr
+clip_fc <- opt$clip_fc
+if (!is.na(clip_fc) && clip_fc <= 1) {
+  stop("--clip_fc must be greater than 1 (fold change is clipped symmetrically to [1/clip_fc, clip_fc]).")
+}
 fc_threshold <- opt$fc_threshold
 frac_patients_threshold <- opt$frac_patients_threshold
 score_threshold <- opt$score_threshold
@@ -145,6 +150,9 @@ regions.all <- regions.all %>%
   mutate(group = recode(type, Amp = "Amplification", Del = "Deletion")) %>%
   mutate(
     fc = exp(ldiff),
+    # fc is drawn on a log axis and centred on 1, so clip it symmetrically in log
+    # space: clip_fc = 5 constrains fc to [1/5, 5]. NA (default) means no clipping.
+    fc = if (is.na(clip_fc)) fc else pmin(pmax(fc, 1 / clip_fc), clip_fc),
     fdr = pmax(fdr, clip_fdr),
     chr = paste0(chromosome, arm)
   ) %>%

@@ -96,7 +96,7 @@ fdr_threshold <- opt$fdr_threshold
 clip_fdr <- opt$clip_fdr
 clip_fc <- opt$clip_fc
 if (!is.na(clip_fc) && clip_fc <= 1) {
-  stop("--clip_fc must be greater than 1 (fold change is clipped symmetrically to [1/clip_fc, clip_fc]).")
+  clip_fc <- 1 / clip_fc
 }
 fc_threshold <- opt$fc_threshold
 frac_patients_threshold <- opt$frac_patients_threshold
@@ -123,7 +123,7 @@ exit_no_plot <- function(...) {
   quit(save = "no", status = 0)
 }
 
-read_regions <- function(path, tag) {
+read_regions <- function(path, tag, frac_col) {
   if (!file.exists(path) || file.info(path)$size == 0) {
     cat(sprintf("Region file is missing or empty: %s\n", path))
     return(NULL)
@@ -134,11 +134,19 @@ read_regions <- function(path, tag) {
     return(NULL)
   }
   regions$cohort <- tag
+  # Newer region tables report the carrier fraction for both cohorts; use the
+  # one for the cohort the region is enriched in.
+  if (!("frac_patients" %in% names(regions))) {
+    regions$frac_patients <- if (frac_col %in% names(regions)) regions[[frac_col]] else NA_real_
+  }
+  if (!("is_significant" %in% names(regions))) {
+    regions$is_significant <- "S"
+  }
   return(mutate(regions, chromosome = as.character(chromosome)))
 }
 
-regions.case <- read_regions(case_regions, case_tag)
-regions.control <- read_regions(control_regions, control_tag)
+regions.case <- read_regions(case_regions, case_tag, "frac_patients_case")
+regions.control <- read_regions(control_regions, control_tag, "frac_patients_control")
 
 regions.all <- bind_rows(regions.case, regions.control)
 if (nrow(regions.all) == 0) {
@@ -152,8 +160,28 @@ regions.all <- regions.all %>%
     fc = exp(ldiff),
     # fc is drawn on a log axis and centred on 1, so clip it symmetrically in log
     # space: clip_fc = 5 constrains fc to [1/5, 5]. NA (default) means no clipping.
+    # Record which points get clipped so they can be drawn as directional triangles.
+    clip_right = !is.na(clip_fc) & fc > clip_fc,
+    clip_left  = !is.na(clip_fc) & fc < 1 / clip_fc,
     fc = if (is.na(clip_fc)) fc else pmin(pmax(fc, 1 / clip_fc), clip_fc),
+    clip_sig = fdr < clip_fdr,
     fdr = pmax(fdr, clip_fdr),
+    # Encode the clip direction as a unit vector. Significance-axis clipping points
+    # towards the significant end of each panel: up for amplifications (top panel),
+    # down for deletions (bottom panel). fc clipping points left/right.
+    clip_dx = dplyr::case_when(clip_right ~ 1, clip_left ~ -1, TRUE ~ 0),
+    clip_dy = dplyr::if_else(clip_sig, dplyr::if_else(type == "Amp", 1, -1), 0),
+    clipped = clip_dx != 0 | clip_dy != 0,
+    # Points clipped on a single axis are triangles pointing that way; points clipped
+    # on both fold change and FDR are drawn as a diamond instead.
+    clip_both = clip_dx != 0 & clip_dy != 0,
+    clip_sides = dplyr::if_else(clip_both, 4L, 3L),
+    clip_angle = dplyr::if_else(clip_both, pi / 2, atan2(clip_dy, clip_dx)),
+    clip_kind = dplyr::case_when(
+      clip_both ~ "clipped\n(FC & FDR)",
+      clipped   ~ "clipped\n(FC or FDR)",
+      TRUE      ~ NA_character_
+    ),
     chr = paste0(chromosome, arm)
   ) %>%
   arrange(score)  # draw lower score points first.
@@ -168,6 +196,10 @@ if (nrow(regions.all) == 0) {
   exit_no_plot("No Amp/Del region with a finite fold change and FDR.")
 }
 regions.all$group <- factor(regions.all$group, levels = c("Amplification", "Deletion", "non-significant"))
+
+# Marker shapes for the clip legend. Which of them actually appear is decided per
+# plot from the markers that end up inside the panels (see plot_vulcano_combined).
+clip_shape_values <- c("clipped\n(FC or FDR)" = 24, "clipped\n(FC & FDR)" = 23)
 
 
 # Annotate results ############################################################
@@ -200,13 +232,32 @@ idx <- with(
   & n_obs >= n_obs_threshold
   # & score >= score_threshold  # data is colored by score
   & end - start + 1 > min_seg_size  # intervals are padded
+  & is_significant != "VETO"  # vetoed by the cohort carrier-fraction filter
 )
 regions.all$group[!idx] <- "non-significant"
 
 
-regions.all$gene <- NA
+regions.all$gene <- NA_character_
 
-if (file.exists(drivers_amp_file) & file.exists(drivers_del_file) & file.exists(chr_arms_file) & file.exists(gencode_file)) {
+# Only intervals that clear the score gate and are not marked non-significant get
+# a label. Computed once here so every annotation source below is filtered the
+# same way - including a table that arrives with a pre-populated "genes" column.
+label_eligible <- (
+  regions.all$score >= score_threshold
+  & regions.all$group != "non-significant"
+)
+label_eligible[is.na(label_eligible)] <- FALSE
+
+if ("genes" %in% names(regions.all)) {
+  cat("Using gene annotations already present in the regions table...\n")
+
+  # The regions table was annotated upstream; reuse it instead of redoing the
+  # gencode lookup. Normalise blanks to NA so unannotated intervals stay unlabelled.
+  pre_annotated <- trimws(as.character(regions.all$genes))
+  pre_annotated[pre_annotated %in% c("", "NA", "NaN", ".")] <- NA_character_
+  regions.all$gene <- pre_annotated
+
+} else if (file.exists(drivers_amp_file) & file.exists(drivers_del_file) & file.exists(chr_arms_file) & file.exists(gencode_file)) {
   cat("Annotating intervals with pre-selected nominated driver genes...\n")
 
   # Annotate intervals with pre-selected nominated driver genes
@@ -232,8 +283,8 @@ if (file.exists(drivers_amp_file) & file.exists(drivers_del_file) & file.exists(
   genes <- foverlaps(gencode.dt, chr.arms.dt, type = "within", nomatch = NA)
   genes <- genes[, .(HGNC, Chr = chr, Start = i.start, End = i.end, Arm = arm)]
 
-  pad <- 2 * 1e6
-  annotate_drivers <- function(regions, symbols, region_type) {
+  pad <- 1 * 1e6
+  annotate_drivers <- function(regions, symbols, region_type, eligible) {
     for (g in symbols) {
       loci <- genes[genes$HGNC == g, ]
       if (nrow(loci) == 0) {
@@ -247,12 +298,7 @@ if (file.exists(drivers_amp_file) & file.exists(drivers_del_file) & file.exists(
           regions$start - pad <= loci$End[k] &
           regions$end + pad >= loci$Start[k]
       }))
-      hits <- (
-        near
-        & regions$type == region_type
-        & regions$group != "non-significant"
-        & regions$score > score_threshold
-      )
+      hits <- near & regions$type == region_type & eligible
       hits[is.na(hits)] <- FALSE
       regions$gene[hits] <- ifelse(
         is.na(regions$gene[hits]) | regions$gene[hits] == "" | regions$gene[hits] == regions$chr[hits],
@@ -263,28 +309,97 @@ if (file.exists(drivers_amp_file) & file.exists(drivers_del_file) & file.exists(
     return(regions)
   }
 
-  regions.all <- annotate_drivers(regions.all, amps, "Amp")
-  regions.all <- annotate_drivers(regions.all, dels, "Del")
+  regions.all <- annotate_drivers(regions.all, amps, "Amp", label_eligible)
+  regions.all <- annotate_drivers(regions.all, dels, "Del", label_eligible)
 
 } else {
   cat("Annotating intervals with chromosome arm/region...\n")
 
-  # iterate over all rows in regions.case and annotate the chromosome arm/region:
-  for (i in seq_len(nrow(regions.all))) {
-    if (
-      (regions.all$score[i] >= score_threshold)
-        & (regions.all$group[i] != "non-significant")
-        & is.na(regions.all$gene[i])
-    ) {
-      regions.all$gene[i] <- paste0(regions.all$chromosome[i], regions.all$arm[i], ":", floor(regions.all$start[i] / 1e6), "-", ceiling(regions.all$end[i] / 1e6), "M")
-      # regions.all$gene[i] <- paste0(regions.all$chromosome[i], regions.all$arm[i])
-    }
-  }
+  # Fall back to the chromosome arm/region coordinates as the label.
+  idx <- label_eligible & is.na(regions.all$gene)
+  regions.all$gene[idx] <- with(
+    regions.all[idx, ],
+    paste0(chromosome, arm, ":", floor(start / 1e6), "-", ceiling(end / 1e6), "M")
+  )
 
 }
 
+# Apply the eligibility gate uniformly: whichever source supplied the labels,
+# intervals below the score threshold or flagged non-significant stay unlabelled.
+regions.all$gene[!label_eligible] <- NA_character_
+
 
 # Plot results ################################################################
+
+# Clip marker ##################################################################
+`%||%` <- function(a, b) if (is.null(a)) b else a
+
+# A point-like geom that draws a regular polygon of `sides` corners (3 = a
+# triangle, 4 = a diamond) with the first corner placed at `angle` radians,
+# measured from the positive x axis. It flags points whose fold change and/or
+# FDR were clipped for display: a triangle points towards the clipped direction
+# (the true value lies further that way), while a diamond marks points clipped on
+# both axes at once. Drawn as vector polygons (unlike unicode glyphs it is safe
+# on the pdf device) at a constant on-screen size, matching the point `size`
+# aesthetic.
+clip_marker_verts <- function(angle, sides, radius) {
+  k <- seq_len(sides) - 1L
+  a <- angle + 2 * pi * k / sides
+  list(x = radius * cos(a), y = radius * sin(a))
+}
+
+draw_key_clipmarker <- function(data, params, size) {
+  sides <- if (is.null(data$sides) || is.na(data$sides)) 3 else data$sides
+  angle <- if (is.null(data$angle) || is.na(data$angle)) pi / 2 else data$angle
+  radius <- (data$size %||% 1.5) * (params$size_factor %||% 0.72)
+  v <- clip_marker_verts(angle, sides, radius)
+  grid::polygonGrob(
+    x = unit(0.5, "npc") + unit(v$x, "mm"),
+    y = unit(0.5, "npc") + unit(v$y, "mm"),
+    gp = gpar(
+      fill = alpha(data$fill %||% "grey50", data$alpha %||% NA),
+      col  = data$colour %||% "black",
+      lwd  = (data$stroke %||% 0.1) * .stroke / 2
+    )
+  )
+}
+
+GeomClipMarker <- ggproto("GeomClipMarker", Geom,
+  required_aes = c("x", "y", "angle"),
+  default_aes = aes(size = 1.5, colour = "black", fill = "grey50", stroke = 0.1,
+                    alpha = NA, sides = 3),
+  draw_key = draw_key_clipmarker,
+  draw_panel = function(data, panel_params, coord, size_factor = 0.72) {
+    coords <- coord$transform(data, panel_params)
+    n <- nrow(coords)
+    if (n == 0) {
+      return(grid::nullGrob())
+    }
+    radius <- coords$size * size_factor            # circumradius in mm
+    sides <- if (is.null(coords$sides)) rep(3, n) else coords$sides
+    verts <- lapply(seq_len(n), function(i) clip_marker_verts(coords$angle[i], sides[i], radius[i]))
+    nv <- vapply(verts, function(v) length(v$x), integer(1))
+    grid::polygonGrob(
+      x  = unit(rep(coords$x, nv), "npc") + unit(do.call(c, lapply(verts, `[[`, "x")), "mm"),
+      y  = unit(rep(coords$y, nv), "npc") + unit(do.call(c, lapply(verts, `[[`, "y")), "mm"),
+      id = rep(seq_len(n), nv),
+      gp = gpar(
+        fill = alpha(coords$fill, coords$alpha),
+        col  = coords$colour,
+        lwd  = coords$stroke * .stroke / 2
+      )
+    )
+  }
+)
+
+geom_clipmarker <- function(mapping = NULL, data = NULL, ..., size_factor = 0.72,
+                            show.legend = NA, inherit.aes = TRUE) {
+  layer(
+    geom = GeomClipMarker, mapping = mapping, data = data, stat = "identity",
+    position = "identity", show.legend = show.legend, inherit.aes = inherit.aes,
+    params = list(size_factor = size_factor, ...)
+  )
+}
 
 revlog_trans <- function(base = exp(1)) {
   trans <- function(x) -log(x, base)
@@ -393,8 +508,8 @@ if (!any(hits_to_plot)) {
 # Every value in the other panel is then censored, its x scale trains to c(Inf, -Inf),
 # and the duplicated x axis dies in ggplot2's mono_test(). Keep 1 inside the range.
 fc_hits <- regions.all$fc[hits_to_plot]
-xmin <- 1 / 1.1 * min(1, fc_hits)
-xmax <- 1.1     * max(1, fc_hits)
+xmin <- min(1, fc_hits)
+xmax <- max(1, fc_hits)
 
 # Anchors of the two cohort labels above the top panel: midpoints in log2 space for the
 # left/right halves. Needed outside make_plot() to size the figure margins.
@@ -423,7 +538,21 @@ plot_vulcano_combined <- function(amp_regions, del_regions, suffix = "both") {
   sig_del_fdr = del_regions$fdr[del_regions$group != "non-significant"]
   amp_ymin = fdr_axis_min(sig_amp_fdr)
   del_ymin = fdr_axis_min(sig_del_fdr)
-  ymax = 1
+  ymax = 0.35
+
+  # A clipped point is only drawn if its (clipped) position still falls inside the
+  # panel's axis range; otherwise it is censored. Advertise a clip marker in the
+  # legend only when at least one such marker is actually visible, so the legend
+  # never shows a shape that has no counterpart in the plot.
+  clip_kinds_shown <- function(reg, ymin) {
+    reg$clip_kind[reg$clipped &
+                    reg$fc  >= xmin & reg$fc  <= xmax &
+                    reg$fdr >= ymin & reg$fdr <= ymax]
+  }
+  clip_levels_present <- names(clip_shape_values)[
+    names(clip_shape_values) %in% c(clip_kinds_shown(amp_regions, amp_ymin),
+                                    clip_kinds_shown(del_regions, del_ymin))
+  ]
 
   height_ratio = (log(amp_ymin) - log(ymax)) / (log(del_ymin) - log(ymax))
   if (!is.finite(height_ratio) || height_ratio <= 0) {
@@ -478,6 +607,11 @@ plot_vulcano_combined <- function(amp_regions, del_regions, suffix = "both") {
         mixed_text_col = mix_to_grey_vec(base_col, score, grey = group_colors["non-significant"], darker = TRUE)
       )
 
+    # Clipped points are drawn as triangles pointing towards their true (off-panel)
+    # value; the rest keep the standard circle marker.
+    regions_circle <- regions %>% filter(!clipped)
+    regions_tri    <- regions %>% filter(clipped)
+
     # Display score contour lines:
     scores <- c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.99, 0.999)
     sig_threshold_lines <- map_dfr(scores, function(w) {
@@ -505,7 +639,7 @@ plot_vulcano_combined <- function(amp_regions, del_regions, suffix = "both") {
 
     # MAKE PLOT
 
-    ggplot() +
+    plt <- ggplot() +
       # MID LINE
       geom_vline(xintercept = 1) +
 
@@ -531,12 +665,22 @@ plot_vulcano_combined <- function(amp_regions, del_regions, suffix = "both") {
 
       # SCATTER PLOT
       geom_point(
-        data = regions,
+        data = regions_circle,
         aes(x = fc, y = fdr, size = frac_patients, fill = I(mixed_col)),
         shape  = 21,
         stroke = 0.1,
         # position = position_jitter(width = 0.02, height = 0.02),
         show.legend = c(size = !is_top, fill = FALSE)
+      ) +
+      # CLIPPED POINTS: triangles point towards the true off-panel value; points
+      # clipped on both fold change and FDR are drawn as diamonds instead.
+      geom_clipmarker(
+        data = regions_tri,
+        aes(x = fc, y = fdr, size = frac_patients, angle = clip_angle,
+            sides = clip_sides, fill = I(mixed_col)),
+        colour = "black",
+        stroke = 0.1,
+        show.legend = FALSE
       ) +
       # # LEGEND-ONLY POINTS (for group legend)
       geom_point(
@@ -554,6 +698,7 @@ plot_vulcano_combined <- function(amp_regions, del_regions, suffix = "both") {
         values = group_colors,
         drop = FALSE,
         guide = guide_legend(
+          order = 1,
           override.aes = list(
             alpha  = 1,
             shape  = 21,
@@ -567,6 +712,7 @@ plot_vulcano_combined <- function(amp_regions, del_regions, suffix = "both") {
         breaks = if (!is_top) c(0.25, 0.5, 0.75) else waiver(),
         labels = if (!is_top) scales::percent_format(accuracy = 1) else waiver(),
         guide  = if (is_top) "none" else guide_legend(
+          order = 2,
           override.aes = list(
             alpha  = 1,
             shape  = 21,
@@ -617,6 +763,28 @@ plot_vulcano_combined <- function(amp_regions, del_regions, suffix = "both") {
       coord_cartesian(clip = "off") +   # allow drawing outside panel
       xlab(if (!is_top) paste0("CNV summary statistic contrast") else NULL) +
       ylab(paste("false discovery rate", if (is_top) "(AMP)" else "(DEL)"))
+
+    # Legend for the clip markers that are present. Defined only on the bottom panel
+    # (patchwork collects guides across panels); adding a dangling shape scale to a
+    # panel with no visible clip-legend layer breaks the guide builder.
+    if (length(clip_levels_present) > 0 && !is_top) {
+      plt <- plt +
+        geom_point(
+          data = tibble(clip_kind = clip_levels_present, fc = NA_real_, fdr = NA_real_),
+          aes(x = fc, y = fdr, shape = clip_kind),
+          fill = "grey40", colour = "black", size = 3.5, stroke = 0.3,
+          inherit.aes = FALSE
+        ) +
+        scale_shape_manual(
+          name = "Clipping",
+          values = clip_shape_values,
+          breaks = clip_levels_present,
+          limits = clip_levels_present,
+          na.translate = FALSE,
+          guide = guide_legend(order = 3)
+        )
+    }
+    plt
   }
 
   amp_case_plot <- make_plot(amp_regions, is_top=TRUE)

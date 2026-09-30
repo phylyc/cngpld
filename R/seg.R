@@ -604,7 +604,7 @@ compare_segs <- function(case, control, params=NULL, hparams=NULL,
 	# fit models for amp and del separately, and for each chromosome
 	msets <- mapply(
 		function(dset, type) {
-			lapply(names(dset), function(i) {
+			mset <- mclapply(names(dset), function(i) {
 					if (verbose >= 1) {
 						message("Processing ", type, " ", i)
 					}
@@ -617,6 +617,13 @@ compare_segs <- function(case, control, params=NULL, hparams=NULL,
 					}
 				)
 			})
+			# mclapply forks catch errors and return them as values, so
+			# re-raise here to preserve fail-fast behavior on any chromosome.
+			failed <- vapply(mset, inherits, logical(1), what = "try-error")
+			if (any(failed)) {
+				stop("gpldiff failed for ", type, " ", paste(names(dset)[failed], collapse = ", "))
+			}
+			mset
 		},
 		dsets, names(dsets),
 		SIMPLIFY = FALSE

@@ -11,6 +11,7 @@ suppressPackageStartupMessages({
   library(purrr)
   library(GenomicRanges)
   library(cngpld)
+  library(gpldiff)
   library(rjson)
   library(optparse)
 })
@@ -31,7 +32,10 @@ option_list = list(
 	make_option(c("--use_cache"), action="store_true", default=FALSE, help="Flag to enable caching of the model (default: FALSE)."),
 	make_option(c("--is_paired"), action="store_true", default=FALSE, help="Whether case and control cohorts are paired samples from the same patients (default: FALSE)."),
 	# Statistical & CNV Thresholds
-	make_option(c("--lodds_cut"), type="numeric", default=5, help="Probability of discovery cut-off (default: %default).", metavar="NUM"),
+	make_option(c("--lodds_cut"), type="numeric", default=NULL, help="Legacy single log-odds threshold; if supplied, disables peak decomposition.", metavar="NUM"),
+	make_option(c("--lodds_support"), type="numeric", default=3, help="Log posterior odds threshold defining candidate support regions (default: %default).", metavar="NUM"),
+	make_option(c("--lodds_core"), type="numeric", default=5, help="Higher log posterior odds threshold defining peak cores (default: %default).", metavar="NUM"),
+	make_option(c("--peak_prominence"), type="numeric", default=1.5, help="Minimum log-odds drop between adjacent cores required to split them (default: %default).", metavar="NUM"),
 	make_option(c("--cn_res"), type="numeric", default=100, help="Aggregated log copy-ratio signal resolution 1/cn.res (default: %default).", metavar="NUM"),
 	make_option(c("--min_tCR"), type="numeric", default=0.3, help="Absolute copy-ratio threshold for CNV summary stats (default: %default).", metavar="NUM"),
 	make_option(c("--max_tCR"), type="numeric", default=3.5, help="Cap maximum total copy-ratio to avoid differential signal being dominated by differences in amount of cDNA amplifications (default: %default).", metavar="NUM"),
@@ -42,7 +46,8 @@ option_list = list(
 	make_option(c("--fdr_threshold"), type="numeric", default=0.1,  help="FDR threshold for annotation scoring (default: %default).", metavar="NUM"),
 	make_option(c("--fc_threshold"), type="numeric", default=1.15,  help="Fold-change threshold for annotation scoring (default: %default).", metavar="NUM"),
 	make_option(c("--frac_patients_threshold"), type="numeric", default=0.1, help="Minimum fraction of patients required to retain an interval (default: %default).", metavar="NUM"),
-	make_option(c("--score_threshold"), type="numeric", default=0.5, help="Annotation confidence threshold (default: %default).", metavar="NUM"),
+	make_option(c("--delta_frac_patients_threshold"), type="numeric", default=0.00, help="Minimum increase in the fraction of patients carrying the signal in the enriched cohort relative to the other cohort. Vetoes latent differences that are boundary artifacts of the GP (default: %default).", metavar="NUM"),
+	make_option(c("--score_threshold"), type="numeric", default=0.68, help="Annotation confidence threshold (default: %default).", metavar="NUM"),
 	make_option(c("--min_seg_size"), type="integer", default=5e4, help="Minimum segment size (base pairs) for significance (default: %default).", metavar="INT"),
 	make_option(c("--n_obs_threshold"), type="integer", default=5, help="Minimum number of observations (probes) required for significance (default: %default).", metavar="INT"),
   make_option(c("--n_cores"), type="integer", default=1, help="Number of CPU cores to use (default: %default).", metavar="INT")
@@ -70,6 +75,14 @@ genome <- opt$genome
 use_cache <- opt$use_cache
 is_paired <- opt$is_paired
 lodds_cut <- opt$lodds_cut
+lodds_support <- opt$lodds_support
+lodds_core <- opt$lodds_core
+peak_prominence <- opt$peak_prominence
+if (!is.null(lodds_cut)) {
+  # Backward-compatible single-threshold behavior.
+  lodds_support <- lodds_cut
+  lodds_core <- NULL
+}
 cn_res <- opt$cn_res
 min_tCR <- opt$min_tCR
 max_tCR <- opt$max_tCR
@@ -79,6 +92,7 @@ weight_by_cohort_size <- opt$weight_by_cohort_size
 fdr_threshold <- opt$fdr_threshold
 fc_threshold <- opt$fc_threshold
 frac_patients_threshold <- opt$frac_patients_threshold
+delta_frac_patients_threshold <- opt$delta_frac_patients_threshold
 score_threshold <- opt$score_threshold
 min_seg_size <- opt$min_seg_size
 n_obs_threshold <- opt$n_obs_threshold
@@ -89,11 +103,11 @@ dir.create(paste0(outdir), showWarnings = FALSE, recursive = TRUE)
 # Run analysis ################################################################
 seg.case <- cngpld::read_seg(
   case_file
-) %>% mutate( logr = pmin(pmax(-3, log(2) * logr), max_tCR) ) %>% filter( nprobes >= min_nprobes )
+) %>% mutate( logr = pmin(pmax(-max_tCR, log(2) * logr), max_tCR) ) %>% filter( nprobes >= min_nprobes )
 
 seg.control <- cngpld::read_seg(
   control_file
-) %>% mutate( logr = pmin(pmax(-3, log(2) * logr), max_tCR) ) %>% filter( nprobes >= min_nprobes )
+) %>% mutate( logr = pmin(pmax(-max_tCR, log(2) * logr), max_tCR) ) %>% filter( nprobes >= min_nprobes )
 
 fits.fn <- paste0(outdir, "/", case_tag, "-vs-", control_tag, ".rds")
 if (file.exists(fits.fn) & use_cache) {
@@ -134,10 +148,52 @@ fits.orig <- fits
 idx <- unlist(lapply(fits$del, function(x) is(x$model, "gpldiff")))
 fits$del <- fits$del[idx]
 
-regions.case <- summary(fits, genome = genome, lodds.cut = lodds_cut)
-regions.control <- summary(fits, direction = -1, genome = genome, lodds.cut = lodds_cut)
+regions.case <- summary(
+  fits,
+  genome = genome,
+  lodds.cut = lodds_support,
+  lodds.core = lodds_core,
+  peak.prominence = peak_prominence
+)
+regions.control <- summary(
+  fits,
+  direction = -1,
+  genome = genome,
+  lodds.cut = lodds_support,
+  lodds.core = lodds_core,
+  peak.prominence = peak_prominence
+)
+
+# summary() returns NULL for a direction when no significant regions are found.
+# Guard both directions so downstream steps still produce (possibly empty) tables.
+empty_regions <- data.frame(
+  type = character(),
+  chromosome = character(),
+  start = numeric(),
+  end = numeric(),
+  start_idx = integer(),
+  end_idx = integer(),
+  n_obs = integer(),
+  diff = numeric(),
+  ldiff = numeric(),
+  posterior = numeric(),
+  fdr = numeric(),
+  stringsAsFactors = FALSE
+)
+# Prefer a zero-row copy of a non-NULL result (preserves the exact schema),
+# otherwise fall back to the canonical empty template.
+regions_template <- if (!is.null(regions.case)) {
+  regions.case[FALSE, ]
+} else if (!is.null(regions.control)) {
+  regions.control[FALSE, ]
+} else {
+  empty_regions
+}
+if (is.null(regions.case)) {
+  regions.case <- regions_template
+}
 if (is.null(regions.control)) {
-  regions.control <- regions.case[FALSE,]
+  regions.control <- regions_template
 }
 
 # Create plots for each chr arm
@@ -186,7 +242,10 @@ regions.control <- split_chr_arm(regions.control)
 seg.case <- as.data.table(seg.case)
 seg.control <- as.data.table(seg.control)
 
-annotate_frac_patients <- function(regions, seg, min_tCR) {
+annotate_frac_patients <- function(regions, col, seg, min_tCR) {
+  regions <- as.data.table(regions)
+  seg <- as.data.table(seg)
+
   # total number of samples in this cohort
   n_samples <- uniqueN(seg$sample)
 
@@ -194,33 +253,43 @@ annotate_frac_patients <- function(regions, seg, min_tCR) {
   setkey(seg,     chromosome, start, end)
   setkey(regions, chromosome, start, end)
 
-  # initialize result
-  regions[,    region_id := .I]
-  regions[, frac_patients := 0]
+  # initialize result; (col) forces evaluation of the variable as column name
+  regions[, region_id := .I]
+  regions[, (col) := 0]
 
-  ## Amplifications: logr > min_tCR
-  seg_amp <- seg[logr >= min_tCR]
-  if (nrow(seg_amp)) {
-    hits_amp <- foverlaps(seg_amp, regions[type == "Amp"], nomatch = 0L)
-    # hits_amp has both seg + region columns; count unique samples per region
-    amp_counts <- hits_amp[, .(n_samples_hit = uniqueN(sample)), by = region_id]
-    regions[amp_counts, frac_patients := n_samples_hit / n_samples, on = "region_id"]
+  if (nrow(regions) == 0 || n_samples == 0) {
+    regions[, region_id := NULL]
+    return(regions[])
   }
 
-  ## Deletions: logr < -min_tCR
-  seg_del <- seg[logr <= -min_tCR]
-  if (nrow(seg_del)) {
-    hits_del <- foverlaps(seg_del, regions[type == "Del"], nomatch = 0L)
-    del_counts <- hits_del[, .(n_samples_hit = uniqueN(sample)), by = region_id]
-    regions[del_counts, frac_patients := n_samples_hit / n_samples, on = "region_id"]
+  count_frac <- function(seg_sub, region_type) {
+    regions_sub <- regions[type == region_type]
+    if (nrow(seg_sub) == 0 || nrow(regions_sub) == 0) return(invisible(NULL))
+    setkey(regions_sub, chromosome, start, end)
+    hits <- foverlaps(seg_sub, regions_sub, nomatch = 0L)
+    if (nrow(hits) == 0) return(invisible(NULL))
+    # hits has both seg + region columns; count unique samples per region
+    counts <- hits[, .(n_samples_hit = uniqueN(sample)), by = region_id]
+    regions[counts, (col) := i.n_samples_hit / n_samples, on = "region_id"]
+    invisible(NULL)
   }
+
+  count_frac(seg[logr >= min_tCR], "Amp")   # amplifications
+  count_frac(seg[logr <= -min_tCR], "Del")  # deletions
 
   regions[, region_id := NULL] # drop temp ID
   regions[]
 }
 
-regions.case <- annotate_frac_patients(regions.case, seg.case, min_tCR)
-regions.control <- annotate_frac_patients(regions.control, seg.control, min_tCR)
+annotate_both_cohorts <- function(regions) {
+  regions <- annotate_frac_patients(regions, "frac_patients_case", seg.case, min_tCR)
+  regions <- annotate_frac_patients(regions, "frac_patients_control", seg.control, min_tCR)
+  regions[, delta_frac_patients := frac_patients_case - frac_patients_control]
+  regions[]
+}
+
+regions.case <- annotate_both_cohorts(regions.case)
+regions.control <- annotate_both_cohorts(regions.control)
 
 
 # The "score" is a measure of confidence in this interval as a characteristic of the difference between those two cohorts.
@@ -237,31 +306,63 @@ def_score <- function(fdr, fc) {
   return(sig(x_abslog(fdr, t=fdr_threshold)) * sig(x_abslog(fc, t=fc_threshold)) ) 
 }
 
-regions.case <- regions.case %>%
-  mutate(score = def_score(fdr=fdr, fc=exp(ldiff)), is_significant = "S") %>%
-  mutate(IGV = paste0("chr", chromosome, ":", start, "-", end)) %>%
-  arrange(desc(score))
-idx <- with(
-  regions.case,
-  frac_patients >= frac_patients_threshold
-  & n_obs >= n_obs_threshold
-  & score >= score_threshold
-  & end - start + 1 > min_seg_size
-)
-regions.case$is_significant[!idx] = "NS"
+# Label regions as significant ("S"), not significant ("NS"), not relevant ("NR"),
+# or vetoed ("VETO"). The veto catches latent differences that are artifacts of
+# GP boundary effects: a genuine difference must also be carried by a larger fraction
+# of the cohort the region is enriched in than by the other cohort.
+# The Bayesian FDR is recomputed from the posterior column over the set of retained
+# ("S" and "NS") entries only, since "NR" and "VETO" entries are not relevant or are
+# vetoed and should not contribute to the multiple-testing burden. The score, which
+# separates "S" from "NS", is then derived from this recomputed FDR.
+annotate_regions <- function(regions, direction = c("case", "control")) {
+  direction <- match.arg(direction)
+  regions <- as.data.frame(regions)
+  if (direction == "case") {
+    frac_own <- regions$frac_patients_case
+    delta <- regions$delta_frac_patients
+  } else {
+    frac_own <- regions$frac_patients_control
+    delta <- -regions$delta_frac_patients
+  }
 
-regions.control <- regions.control %>%
-  mutate(score = def_score(fdr=fdr, fc=exp(ldiff)), is_significant = "S") %>%
-  mutate(IGV = paste0("chr", chromosome, ":", start, "-", end)) %>%
-  arrange(desc(score))
-idx <- with(
-  regions.control,
-  frac_patients >= frac_patients_threshold
-  & n_obs >= n_obs_threshold
-  & score >= score_threshold
-  & end - start + 1 > min_seg_size
-)
-regions.control$is_significant[!idx] = "NS"
+  # Retained ("S" or "NS") entries: neither vetoed nor irrelevant.
+  # This classification does not depend on the score, so the FDR can be recomputed
+  # on this subset without circularity.
+  retained <- rep(FALSE, nrow(regions))
+  if (nrow(regions) > 0) {
+    is_veto <- delta < delta_frac_patients_threshold
+    is_relevant <- frac_own >= frac_patients_threshold &
+      regions$n_obs >= n_obs_threshold &
+      regions$end - regions$start + 1 > min_seg_size
+    retained <- !is_veto & is_relevant
+    regions$is_significant <- ifelse(is_veto, "VETO", ifelse(is_relevant, "S", "NR"))
+  } else {
+    regions$is_significant <- character()
+  }
+
+  # Recompute the Bayesian FDR from the posterior (= 1 - local fdp) among retained
+  # entries, ordered by decreasing posterior.
+  if (any(retained)) {
+    idx <- which(retained)
+    ord <- idx[order(regions$posterior[idx], decreasing = TRUE)]
+    regions$fdr[ord] <- gpldiff:::bayesian_fdr(regions$posterior[ord])
+  }
+
+  regions %>%
+    mutate(
+      score = def_score(fdr = fdr, fc = exp(ldiff)),
+      IGV = paste0("chr", chromosome, ":", start, "-", end),
+      is_significant = ifelse(
+        is_significant == "S" & score < score_threshold,
+        "NS",
+        is_significant
+      )
+    ) %>%
+    arrange(desc(score))
+}
+
+regions.case <- annotate_regions(regions.case, direction = "case")
+regions.control <- annotate_regions(regions.control, direction = "control")
 
 io::qwrite(regions.case, file.path(outdir, paste0("cngpld_sig-regions.", case_tag, ".tsv")))
 io::qwrite(regions.control, file.path(outdir, paste0("cngpld_sig-regions.", control_tag, ".tsv")))

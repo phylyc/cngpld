@@ -8,13 +8,16 @@
 #'                   -1 indicates control vs. case.
 #' @param genome     genome build to use for filtering centromeres;
 #'                   \code{NULL} suppresses filtering
-#' @param lodds.cut  initial log posterior odds threshold for
-#'                   \code{gpldiff::find_sig_regions}
+#' @param lodds.cut  log posterior odds threshold defining candidate support regions
+#' @param lodds.core optional higher log posterior odds threshold defining peak cores;
+#'                   \code{NULL} preserves the original single-threshold behavior
+#' @param peak.prominence minimum log-odds drop required to split adjacent cores
 #' @param ...        other parameters passed to underlying functions
 #' @return a \code{list} of \code{data.frame}
 #' @method summary cn_gpldiffs
 #' @export
-summary.cn_gpldiffs <- function(object, direction=1, genome=NULL, lodds.cut=10, ...) {
+summary.cn_gpldiffs <- function(object, direction=1, genome=NULL, lodds.cut=10,
+	lodds.core=NULL, peak.prominence=1.5, ...) {
 	# cn_gpldiffs is organized as a list of lists,
 	# with first level grouping by type (amp vs. del)
 
@@ -24,7 +27,9 @@ summary.cn_gpldiffs <- function(object, direction=1, genome=NULL, lodds.cut=10, 
 			mclapply(fset,
 				function(fit) {
 					gpldiff::find_sig_regions(
-						fit$model, fit$data, direction=direction, process=FALSE, lodds.cut=lodds.cut, ...
+						fit$model, fit$data, direction=direction, process=FALSE,
+						lodds.cut=lodds.cut, lodds.core=lodds.core,
+						min.prominence=peak.prominence, ...
 					)
 				}
 			)

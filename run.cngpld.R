@@ -6,7 +6,6 @@ suppressPackageStartupMessages({
   library(scales)
   library(ggrepel)
   library(patchwork)
-  library(devtools)
   library(parallel)
   library(purrr)
   library(GenomicRanges)
